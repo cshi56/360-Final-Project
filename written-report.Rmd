@@ -1,0 +1,18 @@
+---
+title: "360 Final Project"
+author: "Group: Flora Shi, Belle Xu"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r}
+stop <- read.table("stop-and-frisk.dat", header = TRUE)
+```
+
+
+
