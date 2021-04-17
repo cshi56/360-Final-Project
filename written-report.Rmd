@@ -5,9 +5,26 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, message=F, warning=F, echo=F}
+library(rstanarm)
+library(rstan)
+library(magrittr)
+library(latex2exp)
 library(tidyverse)
+library(knitr)
+library(broom)
+library(patchwork)
+library(ggplot2)
+library(extraDistr)
+library(coda)
+library(EnvStats)
+library(LearnBayes)
+library(MASS)
+library(ash)
+library(loo)
+require(bayesplot)
+ggplot2::theme_set(ggplot2::theme_bw())
+knitr::opts_chunk$set(fig.aligned = 'center', fig.width = 7, fig.height = 4)
 ```
 
 ```{r}
@@ -15,4 +32,153 @@ stop <- read.table("stop-and-frisk.dat", header = TRUE)
 ```
 
 
+## Exploratory Data Analysis 
 
+Exploratory data analysis should support project goals and help guide specification of model.
+```{r}
+#make categorical variables factor
+stop <- stop %>%
+  mutate(precinct = as.factor(precinct)) %>%
+  mutate(eth = as.factor(eth)) %>%
+  mutate(crime = as.factor(crime))
+```
+
+
+```{r}
+#investigate mean and var of stops 
+stop <- stop %>%
+  group_by(precinct) %>%
+  mutate(stops_in_precinct = sum(stops))
+
+stops_by_precinct <- stop %>% distinct(stops_in_precinct) %>%
+  pull(stops_in_precinct)
+
+mean(stops_by_precinct)
+var(stops_by_precinct) # might need to do NB regression...
+sd(stops_by_precinct)
+max(stops_by_precinct)
+```
+
+```{r}
+precinct <- seq(from = 1, to = 75, by = 1)
+pop_by_precinct<- stop %>% group_by(precinct) %>%
+  mutate(pop_in_precinct = sum(pop)) %>% 
+  distinct(pop_in_precinct) %>%
+  pull(pop_in_precinct)
+by_precinct_df <- data.frame(pop_by_precinct = pop_by_precinct, 
+                                 stops_by_precinct = stops_by_precinct, 
+                                 precinct = as.factor(precinct))
+
+#number of stops vs. precinct pop
+ggplot(data = stops_by_precinct_df,
+       mapping = aes(x = pop_by_precinct, y =stops_by_precinct, 
+                     colour = precinct)) + geom_point()
+#no obvious trend between population in precinct vs. stops in a precinct
+```
+
+```{r, fig.width = 13, fig.height = 4}
+#number of stops by precinct
+ggplot(data = by_precinct_df,
+       mapping = aes(x = precinct, y =stops_by_precinct)) +
+  geom_col()
+#Need interpretation
+```
+
+```{r}
+#number of stops for each ethnicity vs. population for each ethnicity per precinct
+
+ggplot(data = stop, mapping = aes(x = pop, y = stops, colour = eth)) +geom_point()
+#There does seem to be some trend because we can see that none of the points for
+# the white population is in high number of stops despite having very high population
+```
+
+```{r}
+#crime rate for a certain crime for each eth
+stop <- stop %>% mutate(crime_rate = past.arrests/pop)
+#num of stops vs crime rate
+ggplot(data = stop, mapping = aes(x = crime_rate, y = stops, colour = eth)) +geom_point()
+#crime rate is generally low with a few exceptions; however black and hispanic stop count are still
+# a lot higher in low crime rate regions
+```
+## Modeling 
+
+### Rstan GLM
+
+```{r}
+#compute population proportion with in each precinct
+stop <- stop %>% group_by(precinct) %>%
+  mutate(total_pop = sum(pop/4))
+stop <- stop %>% mutate(pop_prop = pop/total_pop)
+#get datasets for different crime types 
+stop.1 <- stop %>% filter(crime == 1)
+stop.2 <- stop %>% filter(crime == 2)
+stop.3 <- stop %>% filter(crime == 3) 
+stop.4 <- stop %>% filter(crime == 4)
+```
+
+```{r}
+#glm for crime 1; done for testing only. don't repeat the code for other crimes yet. 
+#assuming negative binom sampling model
+
+stan.glm.1 <- stan_glm(data = stop.1,
+                   formula = stops ~ crime_rate+ pop_prop+crime_rate * eth+ pop_prop*eth + crime_rate * pop_prop, #this formula isn't correct; how do we separate the crime rate and population proportion for each ethnic group??
+                   family = neg_binomial_2,
+                   seed = 360, 
+                   prior = normal(0,1), #prior choice is debatable. might wanna use dirichlet? 
+                   prior_intercept = normal(0,1),
+                   refresh = 0)
+```
+
+```{r}
+#look at coefficients
+coef(stan.glm.1)
+summary(stan.glm.1)
+```
+```{r}
+#posterior distributions
+mcmc_areas(as.matrix(stan.glm.1), prob = 0.95, prob_outer = 1)
+round(coef(stan.glm.1), 3)
+round(posterior_interval(stan.glm.1, prob = 0.95), 3)
+```
+
+
+```{r}
+# glm with ethnicity as a predictor 
+stan.glm.2 <- stan_glm(data = stop.1,
+                   formula = stops ~ crime_rate+ pop_prop + eth +crime_rate * eth+ pop_prop*eth, 
+                   family = neg_binomial_2,
+                   seed = 360, 
+                   prior = normal(0,1), 
+                   prior_intercept = normal(0,1),
+                   refresh = 0)
+```
+
+
+```{r}
+# glm with first formula, but poisson 
+stan.glm.1.pois <- stan_glm(data = stop.1,
+                   formula = stops ~ crime_rate+ pop_prop+crime_rate * eth+ pop_prop*eth + crime_rate * pop_prop,
+                   family = poisson,
+                   seed = 360, 
+                   prior = normal(0,1),
+                   prior_intercept = normal(0,1),
+                   refresh = 0)
+# glm with second formula, but poisson 
+stan.glm.2.pois <- stan_glm(data = stop.1,
+                   formula = stops ~ crime_rate+ pop_prop + eth +crime_rate * eth+ pop_prop*eth, 
+                   family = poisson,
+                   seed = 360, 
+                   prior = normal(0,1), 
+                   prior_intercept = normal(0,1),
+                   refresh = 0)
+```
+
+```{r}
+#posterior predictive check 
+loo1 <- loo(stan.glm.1, save_psis = TRUE)
+loo2 <- loo(stan.glm.2, save_psis = TRUE)
+loo1.pois <- loo(stan.glm.1.pois, save_psis = TRUE)
+loo2.pois <- loo(stan.glm.2.pois, save_psis = TRUE)
+rstanarm::loo_compare(loo1, loo2, loo1.pois, loo2.pois) #to interpret, need to wait for lab12 answers... or just ask TA
+#also need to ask if there are posterior predictive checks for just one model. 
+```
