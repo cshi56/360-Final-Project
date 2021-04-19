@@ -59,6 +59,7 @@ sd(stops_by_precinct)
 max(stops_by_precinct)
 ```
 
+
 ```{r}
 precinct <- seq(from = 1, to = 75, by = 1)
 pop_by_precinct<- stop %>% group_by(precinct) %>%
@@ -68,11 +69,14 @@ pop_by_precinct<- stop %>% group_by(precinct) %>%
 by_precinct_df <- data.frame(pop_by_precinct = pop_by_precinct, 
                                  stops_by_precinct = stops_by_precinct, 
                                  precinct = as.factor(precinct))
+```
 
+
+```{r}
 #number of stops vs. precinct pop
 ggplot(data = by_precinct_df,
-       mapping = aes(x = pop_by_precinct, y =stops_by_precinct, 
-                     colour = precinct)) + geom_point()+
+       mapping = aes(x = pop_by_precinct, y =stops_by_precinct)) + 
+  geom_point() +
   theme(legend.position = "none") 
 #no obvious trend between population in precinct vs. stops in a precinct
 ```
@@ -80,7 +84,7 @@ ggplot(data = by_precinct_df,
 ```{r, fig.width = 13, fig.height = 4}
 #number of stops by precinct
 ggplot(data = by_precinct_df,
-       mapping = aes(x = precinct, y =stops_by_precinct)) +
+       mapping = aes(x = precinct, y = stops_by_precinct)) +
   geom_col()
 #Need interpretation
 ```
@@ -88,19 +92,22 @@ ggplot(data = by_precinct_df,
 ```{r}
 #number of stops for each ethnicity vs. population for each ethnicity per precinct
 
-ggplot(data = stop, mapping = aes(x = pop, y = stops, colour = eth)) +geom_point()
+ggplot(data = stop, mapping = aes(x = pop, y = stops, colour = eth)) +
+  geom_point()
 #There does seem to be some trend because we can see that none of the points for
 # the white population is in high number of stops despite having very high population
 ```
 
 ```{r}
-#crime rate for a certain crime for each eth
+#crime rate for a certain crime for each eth in a certain precinct
 stop <- stop %>% mutate(crime_rate = past.arrests/pop)
 #num of stops vs crime rate
-ggplot(data = stop, mapping = aes(x = crime_rate, y = stops, colour = eth)) +geom_point()
+ggplot(data = stop, mapping = aes(x = crime_rate, y = stops, colour = eth)) + 
+  geom_point()
 #crime rate is generally low with a few exceptions; however black and hispanic stop count are still
 # a lot higher in low crime rate regions
 ```
+
 ## Modeling 
 
 ### Rstan GLM
@@ -131,6 +138,9 @@ stan.glm.1 <- stan_glm(data = stop.1,
 
 #no r-hat warning = converged. no ess warning = good enough ess. but what to do with divergent transition?
 ```
+
+
+
 ```{r}
 # first glm but with standard normal prior 
 stan.glm.2 <- update(stan.glm.1, prior = normal(0,1), prior_intercept = normal(0,1))
