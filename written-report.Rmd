@@ -41,26 +41,24 @@ stop <- stop %>%
   mutate(precinct = factor(precinct)) %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2"))) %>%
   mutate(crime = factor(crime))
+
+#crime rate for a certain crime for each eth in a certain precinct
+stop <- stop %>% mutate(crime_rate = past.arrests/pop)
+#compute population proportion with in each precinct
+stop <- stop %>% group_by(precinct) %>%
+  mutate(total_pop = sum(pop/4))
+stop <- stop %>% mutate(pop_prop = pop/total_pop)
 ```
 
 
 ```{r}
-#investigate mean and var of stops 
+#make a by-precinct dataframe
 stop <- stop %>%
   group_by(precinct) %>%
   mutate(stops_in_precinct = sum(stops))
 
 stops_by_precinct <- stop %>% distinct(stops_in_precinct) %>%
   pull(stops_in_precinct)
-
-mean(stops_by_precinct)
-var(stops_by_precinct) # might need to do NB regression...
-sd(stops_by_precinct)
-max(stops_by_precinct)
-```
-
-
-```{r}
 precinct <- seq(from = 1, to = 75, by = 1)
 pop_by_precinct<- stop %>% group_by(precinct) %>%
   mutate(pop_in_precinct = sum(pop)) %>% 
@@ -69,85 +67,165 @@ pop_by_precinct<- stop %>% group_by(precinct) %>%
 by_precinct_df <- data.frame(pop_by_precinct = pop_by_precinct, 
                                  stops_by_precinct = stops_by_precinct, 
                                  precinct = as.factor(precinct))
+by_precinct_df <- by_precinct_df %>%
+  mutate(toHighlight = if_else(stops_by_precinct == min(stops_by_precinct)
+                               | stops_by_precinct == max(stops_by_precinct),
+                               "yes", "no"))
 ```
 
 
-```{r}
-#number of stops vs. precinct pop
-ggplot(data = by_precinct_df,
-       mapping = aes(x = pop_by_precinct, y =stops_by_precinct)) + 
-  geom_point() +
-  theme(legend.position = "none") 
-#no obvious trend between population in precinct vs. stops in a precinct
-```
+
 
 ```{r, fig.width = 13, fig.height = 4}
 #number of stops by precinct
 ggplot(data = by_precinct_df,
-       mapping = aes(x = precinct, y = stops_by_precinct)) +
-  geom_col()
+       mapping = aes(x = precinct, y = stops_by_precinct, fill = toHighlight)) +
+  geom_col() +
+    scale_fill_manual(values= c("yes"="tomato", "no"="#a1a1a1"), guide = FALSE)+
+  labs(title = "Number of Stops per Precinct", x = "Precinct Number (1 to 75)",
+       y = "Number of Stops Recorded")
 #Need interpretation
+# get the max and min stops with function and just type it 
+min(by_precinct_df$stops_by_precinct)
+max(by_precinct_df$stops_by_precinct)
+```
+```{r}
+#number of stops vs. precinct pop
+ggplot(data = by_precinct_df,
+       mapping = aes(x = pop_by_precinct, y =stops_by_precinct)) + 
+  geom_point() + 
+  labs(title = "Number of Stops vs. Population per Precinct", 
+       x = "Population Count (per Precinct)", 
+       y = "Number of Stops (per Precinct)") +
+  geom_smooth(method = "lm", formula = y~x, se = FALSE)
+#no obvious trend between population in precinct vs. stops in a precinct
+#maybe weakly positive
 ```
 
 ```{r}
-#number of stops for each ethnicity vs. population for each ethnicity per precinct
+#number of stops for each ethnicity vs. 
+#  population for each ethnicity per precinct
 
 ggplot(data = stop, mapping = aes(x = pop, y = stops, colour = eth)) +
-  geom_point()
-#There does seem to be some trend because we can see that none of the points for
-# the white population is in high number of stops despite having very high population
+  geom_point() +
+  labs(title = "Number of Stops vs. Population per Precinct by Ethnicity",
+       x = "Population Count per Precinct by Ethnicity",
+       y = "Number of Stops per Precinct by Ethnicity", 
+       colour = "Ethnicity") + 
+  scale_color_manual(values = c("#9EBE00","#FD0006","#009B95"),
+                     labels = c("White", "Black", "Hispanic"))
+#There does seem to be some trend because we can see that none of the 
+#  points for the white population is in high number of stops 
+#  despite having very high population
 ```
 
 ```{r}
-#crime rate for a certain crime for each eth in a certain precinct
-stop <- stop %>% mutate(crime_rate = past.arrests/pop)
 #num of stops vs crime rate
 ggplot(data = stop, mapping = aes(x = crime_rate, y = stops, colour = eth)) + 
-  geom_point()
-#crime rate is generally low with a few exceptions; however black and hispanic stop count are still
-# a lot higher in low crime rate regions
+  geom_point() + 
+  labs(title = "Number of Stops vs. Crime Rate in the Past Year per Precinct by Ethnicity",
+       x = "Crime Rate per Precinct by Ethnicity",
+       y = "Number of Stops per Precinct by Ethnicity", 
+       colour = "Ethnicity") + 
+  scale_color_manual(values = c("#9EBE00","#FD0006","#009B95"),
+                     labels = c("White", "Black", "Hispanic"))
+#crime rate is generally low with a few exceptions; however black 
+#  and hispanic stop count are still
+#  a lot higher in low crime rate regions
+```
+
+```{r}
+#get datasets for different crime types 
+stop.1 <- stop %>% filter(crime == 1)
+stop.2 <- stop %>% filter(crime == 2)
+stop.3 <- stop %>% filter(crime == 3) 
+stop.4 <- stop %>% filter(crime == 4)
+#investigate mean and var of each stop 
+Violence <- c(mean(stop.1$stops), var(stop.1$stops))
+Weapon <- c(mean(stop.2$stops), var(stop.2$stops))
+Property <- c(mean(stop.3$stops), var(stop.3$stops))
+Drug <- c(mean(stop.4$stops), var(stop.4$stops))
+df <- data.frame(Violence, Weapon, Property, Drug)
+row.names(df) <- c("Mean", "Variance")
+df
+```
+
+```{r}
+#number of stops per crime for each ethnicity
+ggplot(data = stop, mapping = aes(x = eth, y = stops, fill = crime)) +
+  geom_col(position = "dodge") + 
+  labs(title = "Number of Stops per Crime for each Ethnicity", 
+       x = "Ethnicity", 
+       y = "Number of Stops (per Crime)",
+       fill = "Crime Type") + 
+  scale_x_discrete(labels=c("3" = "White", "1" = "Black",
+                              "2" = "Hispanic")) +
+  scale_fill_manual(values = c("#25B388","#F26C24","#1C5DA6", "#F09A18"),
+                     labels = c("Violent", "Weapon",
+                                "Property", "Drug"))
+#number of past arrests per crime for each ethnicity
+ggplot(data = stop, mapping = aes(x = eth, y = past.arrests, fill = crime)) +
+  geom_col(position = "dodge") + 
+  labs(title = "Number of Past Arrests per Crime for each Ethnicity", 
+       x = "Ethnicity", 
+       y = "Number of Stops (per Crime)",
+       fill = "Crime Type") + 
+  scale_x_discrete(labels=c("3" = "White", "1" = "Black",
+                              "2" = "Hispanic")) +
+  scale_fill_manual(values = c("#25B388","#F26C24","#1C5DA6", "#F09A18"),
+                     labels = c("Violent", "Weapon",
+                                "Property", "Drug"))
+
+#from the two plots above, the stop reasons and past arrests seem to have no relation
 ```
 
 ## Modeling 
 
 ### Rstan GLM
 
-```{r}
-#compute population proportion with in each precinct
-stop <- stop %>% group_by(precinct) %>%
-  mutate(total_pop = sum(pop/4))
-stop <- stop %>% mutate(pop_prop = pop/total_pop)
-#get datasets for different crime types 
-stop.1 <- stop %>% filter(crime == 1)
-stop.2 <- stop %>% filter(crime == 2)
-stop.3 <- stop %>% filter(crime == 3) 
-stop.4 <- stop %>% filter(crime == 4)
-```
 
 ```{r}
 #glm for crime 1; done for testing only. don't repeat the code for other crimes yet. 
 #assuming negative binom sampling model
 
 stan.glm.1 <- stan_glm(data = stop.1,
-                   formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate * eth+ pop_prop*eth + crime_rate * pop_prop,
+                   formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth + crime_rate:pop_prop,
                    family = neg_binomial_2,
                    seed = 360, 
-                   prior = cauchy(), 
-                   prior_intercept = cauchy(),
+                   prior = cauchy(0, 2.5), 
+                   prior_intercept = cauchy(0, 2.5),
                    refresh = 0)
 
-#no r-hat warning = converged. no ess warning = good enough ess. but what to do with divergent transition?
+#no r-hat warning = converged. no ess warning = good enough ess. apparently divergent transitions can be ignored 
 ```
 
 
 
 ```{r}
+# this code chunk has been omitted 
+
 # first glm but with standard normal prior 
-stan.glm.2 <- update(stan.glm.1, prior = normal(0,1), prior_intercept = normal(0,1))
+# stan.glm.2 <- update(stan.glm.1, prior = normal(0,1), prior_intercept = normal(0,1))
 # first glm but with poisson family 
-stan.glm.1.pois <- update(stan.glm.1, family = poisson)
+# stan.glm.1.pois <- update(stan.glm.1, family = poisson)
 # first glm but with standard normal prior & poisson family 
-stan.glm.2.pois <- update(stan.glm.2, family = poisson )
+# stan.glm.2.pois <- update(stan.glm.2, family = poisson )
+```
+
+```{r}
+#checking if omitting stuff will make the model better
+stan.glm.2 <- update(stan.glm.1, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth)
+stan.glm.3 <- update(stan.glm.2, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth)
+stan.glm.4 <- update(stan.glm.3, formula = stops ~ crime_rate + pop_prop + eth)
+stan.glm.5 <- update(stan.glm.4, formula = stops ~ crime_rate + pop_prop)
+```
+```{r}
+#checking if adding/changing stuff will make the model better
+#apparently all the code below cause errors so I can't even check... Already tried with different prior and starting with different vars. 
+
+#stan.glm.6 <- update(stan.glm.1, formula = stops ~ past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth + past.arrests:pop_prop)
+#stan.glm.7 <- update(stan.glm.1, formula = stops ~ crime_rate+ pop+ eth+ crime_rate:eth+ pop:eth +crime_rate:pop)
+#stan.glm.8 <- update(stan.glm.1, formula = stops ~ past.arrests+ pop+ eth+ past.arrests:eth+ pop:eth + past.arrests:pop)
 ```
 
 ```{r}
@@ -165,14 +243,18 @@ round(posterior_interval(stan.glm.1, prob = 0.95), 3)
 #posterior predictive check 
 loo1 <- loo(stan.glm.1, save_psis = TRUE)
 loo2 <- loo(stan.glm.2, save_psis = TRUE)
-loo1.pois <- loo(stan.glm.1.pois, save_psis = TRUE)
-loo2.pois <- loo(stan.glm.2.pois, save_psis = TRUE)
-rstanarm::loo_compare(loo1, loo2, loo1.pois, loo2.pois) #to interpret, need to wait for lab12 answers... or just ask TA
+loo3 <- loo(stan.glm.3, save_psis = TRUE)
+loo4 <- loo(stan.glm.4, save_psis = TRUE)
+loo5 <- loo(stan.glm.5, save_psis = TRUE)
+rstanarm::loo_compare(loo1, loo2, loo3, loo4, loo5) #interestingly enough loo1 is actually the best. 
 ```
 ```{r}
 #making sure that bayesian ver of AIC (pareto k) is good
 loo1
 loo2
+loo3
+loo4 
+loo5
 ```
 
 ```{r}
@@ -185,21 +267,16 @@ plot(loo2, label_points = TRUE)
 #individual model diagnostics - stan.glm.1
 y.postpred <- posterior_predict(stan.glm.1)
 color_scheme_set("brightblue")
-ppc_dens_overlay(stop.1$stops, y.postpred)
+ppc_dens_overlay(stop.1$stops, y.postpred) + xlim(0, 1000) #xlim() truncates so that we focus on the part where x is less than 1000 
 ```
 
-```{r}
-#individual model diagnostics - stan.glm.2
-y.postpred <- posterior_predict(stan.glm.2)
-color_scheme_set("brightblue")
-ppc_dens_overlay(stop.1$stops, y.postpred)
-```
 
 ```{r}
-pp_check(stan.glm.1, plotfun = "boxplot")
-pp_check(stan.glm.1, plotfun = "hist")
-pp_check(stan.glm.1, plotfun = "stat_2d", stat = c("mean", "sd"))  # Scatterplot of two test statistics
-pp_check(stan.glm.1, plotfun = "scatter_avg") # Scatterplot of y vs. average yrep
+pp_check(stan.glm.1, plotfun = "boxplot") #check median/range
+pp_check(stan.glm.1, plotfun = "stat_2d", stat = c("mean", "sd"))  
+    # Scatterplot of two test statistics (capture the mean somewhat but 
+    # sd is kind of bad. at least it's not high sd)
+pp_check(stan.glm.1, plotfun = "scatter_avg") # Scatterplot of y vs. average yrep (our model is good for predicting lower # of crimes)
 ```
 ```{r}
 plot(stan.glm.1, "acf", pars = "(Intercept)")# autocorrelation by chain
@@ -208,4 +285,6 @@ plot(stan.glm.1, "trace", pars = "(Intercept)") #traceplot. how to separate by c
 
 ```{r}
 pp_check(stan.glm.2, plotfun = "stat_2d", stat = c("mean", "sd"))
+pp_check(stan.glm.3, plotfun = "stat_2d", stat = c("mean", "sd"))
+pp_check(stan.glm.4, plotfun = "stat_2d", stat = c("mean", "sd"))
 ```
