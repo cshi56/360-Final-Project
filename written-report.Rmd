@@ -183,6 +183,7 @@ ggplot(data = stop, mapping = aes(x = eth, y = past.arrests, fill = crime)) +
 
 ### Rstan GLM
 
+#### Violent Crimes 
 
 ```{r}
 #glm for crime 1; done for testing only. don't repeat the code for other crimes yet. 
@@ -200,18 +201,6 @@ stan.glm.1 <- stan_glm(data = stop.1,
 ```
 
 
-
-```{r}
-# this code chunk has been omitted 
-
-# first glm but with standard normal prior 
-# stan.glm.2 <- update(stan.glm.1, prior = normal(0,1), prior_intercept = normal(0,1))
-# first glm but with poisson family 
-# stan.glm.1.pois <- update(stan.glm.1, family = poisson)
-# first glm but with standard normal prior & poisson family 
-# stan.glm.2.pois <- update(stan.glm.2, family = poisson )
-```
-
 ```{r}
 #checking if omitting stuff will make the model better
 stan.glm.2 <- update(stan.glm.1, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth)
@@ -219,13 +208,17 @@ stan.glm.3 <- update(stan.glm.2, formula = stops ~ crime_rate+ pop_prop+ eth+ cr
 stan.glm.4 <- update(stan.glm.3, formula = stops ~ crime_rate + pop_prop + eth)
 stan.glm.5 <- update(stan.glm.4, formula = stops ~ crime_rate + pop_prop)
 ```
+
 ```{r}
 #checking if adding/changing stuff will make the model better
-#apparently all the code below cause errors so I can't even check... Already tried with different prior and starting with different vars. 
-
-#stan.glm.6 <- update(stan.glm.1, formula = stops ~ past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth + past.arrests:pop_prop)
-#stan.glm.7 <- update(stan.glm.1, formula = stops ~ crime_rate+ pop+ eth+ crime_rate:eth+ pop:eth +crime_rate:pop)
-#stan.glm.8 <- update(stan.glm.1, formula = stops ~ past.arrests+ pop+ eth+ past.arrests:eth+ pop:eth + past.arrests:pop)
+stan.glm.6 <- stan_glm(data = stop.1,
+                   formula = stops ~ past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth + past.arrests:pop_prop,
+                   family = neg_binomial_2, #how do I justify not having a prior? 
+                   seed = 360,
+                   refresh = 0)
+stan.glm.7 <- update(stan.glm.6, formula = stops ~ crime_rate+ pop+ eth+ crime_rate:eth+ pop:eth +crime_rate:pop)
+stan.glm.8 <- update(stan.glm.6, formula = stops ~ past.arrests+ pop+ eth+ past.arrests:eth+ pop:eth + past.arrests:pop)
+stan.glm.9 <- update(stan.glm.6, formula = stops~past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth)
 ```
 
 ```{r}
@@ -246,21 +239,25 @@ loo2 <- loo(stan.glm.2, save_psis = TRUE)
 loo3 <- loo(stan.glm.3, save_psis = TRUE)
 loo4 <- loo(stan.glm.4, save_psis = TRUE)
 loo5 <- loo(stan.glm.5, save_psis = TRUE)
-rstanarm::loo_compare(loo1, loo2, loo3, loo4, loo5) #interestingly enough loo1 is actually the best. 
+loo6 <- loo(stan.glm.6, save_psis = TRUE)
+loo7 <- loo(stan.glm.7, save_psis = TRUE)
+loo8 <- loo(stan.glm.8, save_psis = TRUE)
+```
+```{r}
+loo9 <- loo(stan.glm.9, save_psis = TRUE)
+```
+```{r}
+rstanarm::loo_compare(loo1, loo2, loo3, loo4, loo5, loo6, loo7, loo8,loo9) #loo6 is the best. 
 ```
 ```{r}
 #making sure that bayesian ver of AIC (pareto k) is good
 loo1
-loo2
-loo3
-loo4 
-loo5
 ```
 
 ```{r}
 #check for outliers (if there are outliers, then post pred will be sensative to 1 observation)
 plot(loo1, label_points = TRUE)
-plot(loo2, label_points = TRUE)
+plot(loo6, label_points = TRUE)
 ```
 
 ```{r}
@@ -279,12 +276,172 @@ pp_check(stan.glm.1, plotfun = "stat_2d", stat = c("mean", "sd"))
 pp_check(stan.glm.1, plotfun = "scatter_avg") # Scatterplot of y vs. average yrep (our model is good for predicting lower # of crimes)
 ```
 ```{r}
-plot(stan.glm.1, "acf", pars = "(Intercept)")# autocorrelation by chain
-plot(stan.glm.1, "trace", pars = "(Intercept)") #traceplot. how to separate by chain?
+plot(stan.glm.1, "acf", pars = "crime_rate")# autocorrelation by chain
+plot(stan.glm.1, "trace", pars = "crime_rate") #traceplot. how to separate by chain?
+```
+```{r}
+glm.matrix <- as.matrix(stan.glm.1)
+```
+```{r}
+pp_check(stan.glm.6, plotfun = "stat_2d", stat = c("mean", "sd"))
+pp_check(stan.glm.6, plotfun = "scatter_avg")
 ```
 
 ```{r}
-pp_check(stan.glm.2, plotfun = "stat_2d", stat = c("mean", "sd"))
-pp_check(stan.glm.3, plotfun = "stat_2d", stat = c("mean", "sd"))
-pp_check(stan.glm.4, plotfun = "stat_2d", stat = c("mean", "sd"))
+#individual model diagnostics - stan.glm.6
+y.postpred <- posterior_predict(stan.glm.6)
+color_scheme_set("brightblue")
+ppc_dens_overlay(stop.1$stops, y.postpred) + xlim(0, 1000) #xlim() truncates so that we focus on the part where x is less than 1000 
+```
+
+#### Weapon Offense
+
+```{r}
+stan.glm.1 <- stan_glm(data = stop.2,
+                   formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth + crime_rate:pop_prop,
+                   family = neg_binomial_2,
+                   seed = 360, 
+                   prior = cauchy(0, 2.5), 
+                   prior_intercept = cauchy(0, 2.5),
+                   refresh = 0)
+```
+
+
+```{r}
+#checking if omitting stuff will make the model better
+stan.glm.2 <- update(stan.glm.1, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth)
+stan.glm.3 <- update(stan.glm.2, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth)
+stan.glm.4 <- update(stan.glm.3, formula = stops ~ crime_rate + pop_prop + eth)
+stan.glm.5 <- update(stan.glm.4, formula = stops ~ crime_rate + pop_prop)
+```
+
+```{r}
+#checking if adding/changing stuff will make the model better
+stan.glm.6 <- stan_glm(data = stop.2,
+                   formula = stops ~ past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth + past.arrests:pop_prop,
+                   family = neg_binomial_2, #how do I justify not having a prior? 
+                   seed = 360,
+                   refresh = 0)
+stan.glm.7 <- update(stan.glm.6, formula = stops ~ crime_rate+ pop+ eth+ crime_rate:eth+ pop:eth +crime_rate:pop)
+stan.glm.8 <- update(stan.glm.6, formula = stops ~ past.arrests+ pop+ eth+ past.arrests:eth+ pop:eth + past.arrests:pop)
+stan.glm.9 <- update(stan.glm.6, formula = stops~past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth)
+```
+
+```{r}
+#posterior predictive check 
+loo1 <- loo(stan.glm.1, save_psis = TRUE)
+loo2 <- loo(stan.glm.2, save_psis = TRUE)
+loo3 <- loo(stan.glm.3, save_psis = TRUE)
+loo4 <- loo(stan.glm.4, save_psis = TRUE)
+loo5 <- loo(stan.glm.5, save_psis = TRUE)
+loo6 <- loo(stan.glm.6, save_psis = TRUE)
+loo7 <- loo(stan.glm.7, save_psis = TRUE)
+loo8 <- loo(stan.glm.8, save_psis = TRUE)
+loo9 <- loo(stan.glm.9, save_psis = TRUE)
+```
+```{r}
+rstanarm::loo_compare(loo1, loo2, loo3, loo4, loo5, loo6, loo7, loo8,loo9) 
+```
+
+#### Property Crimes
+```{r}
+stan.glm.1 <- stan_glm(data = stop.3,
+                   formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth + crime_rate:pop_prop,
+                   family = neg_binomial_2,
+                   seed = 360, 
+                   prior = cauchy(0, 2.5), 
+                   prior_intercept = cauchy(0, 2.5),
+                   refresh = 0)
+```
+
+
+```{r}
+#checking if omitting stuff will make the model better
+stan.glm.2 <- update(stan.glm.1, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth)
+stan.glm.3 <- update(stan.glm.2, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth)
+stan.glm.4 <- update(stan.glm.3, formula = stops ~ crime_rate + pop_prop + eth)
+stan.glm.5 <- update(stan.glm.4, formula = stops ~ crime_rate + pop_prop)
+```
+
+```{r}
+#checking if adding/changing stuff will make the model better
+stan.glm.6 <- stan_glm(data = stop.3,
+                   formula = stops ~ past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth + past.arrests:pop_prop,
+                   family = neg_binomial_2, #how do I justify not having a prior? 
+                   seed = 360,
+                   refresh = 0)
+stan.glm.7 <- update(stan.glm.6, formula = stops ~ crime_rate+ pop+ eth+ crime_rate:eth+ pop:eth +crime_rate:pop)
+stan.glm.8 <- update(stan.glm.6, formula = stops ~ past.arrests+ pop+ eth+ past.arrests:eth+ pop:eth + past.arrests:pop)
+stan.glm.9 <- update(stan.glm.6, formula = stops~past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth)
+```
+
+```{r}
+#posterior predictive check 
+loo1 <- loo(stan.glm.1, save_psis = TRUE)
+loo2 <- loo(stan.glm.2, save_psis = TRUE)
+loo3 <- loo(stan.glm.3, save_psis = TRUE)
+loo4 <- loo(stan.glm.4, save_psis = TRUE)
+loo5 <- loo(stan.glm.5, save_psis = TRUE)
+loo6 <- loo(stan.glm.6, save_psis = TRUE)
+loo7 <- loo(stan.glm.7, save_psis = TRUE)
+loo8 <- loo(stan.glm.8, save_psis = TRUE)
+loo9 <- loo(stan.glm.9, save_psis = TRUE)
+```
+```{r}
+rstanarm::loo_compare(loo1, loo2, loo3, loo4, loo5, loo6, loo7, loo8,loo9) 
+```
+```{r}
+loo1
+loo6
+loo8
+```
+
+
+#### Drug Drimes
+
+```{r}
+stan.glm.1 <- stan_glm(data = stop.4,
+                   formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth + crime_rate:pop_prop,
+                   family = neg_binomial_2,
+                   seed = 360, 
+                   prior = cauchy(0, 2.5), 
+                   prior_intercept = cauchy(0, 2.5),
+                   refresh = 0)
+```
+
+
+```{r}
+#checking if omitting stuff will make the model better
+stan.glm.2 <- update(stan.glm.1, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth+ pop_prop:eth)
+stan.glm.3 <- update(stan.glm.2, formula = stops ~ crime_rate+ pop_prop+ eth+ crime_rate:eth)
+stan.glm.4 <- update(stan.glm.3, formula = stops ~ crime_rate + pop_prop + eth)
+stan.glm.5 <- update(stan.glm.4, formula = stops ~ crime_rate + pop_prop)
+```
+
+```{r}
+#checking if adding/changing stuff will make the model better
+stan.glm.6 <- stan_glm(data = stop.4,
+                   formula = stops ~ past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth + past.arrests:pop_prop,
+                   family = neg_binomial_2, #how do I justify not having a prior? 
+                   seed = 360,
+                   refresh = 0)
+stan.glm.7 <- update(stan.glm.6, formula = stops ~ crime_rate+ pop+ eth+ crime_rate:eth+ pop:eth +crime_rate:pop)
+stan.glm.8 <- update(stan.glm.6, formula = stops ~ past.arrests+ pop+ eth+ past.arrests:eth+ pop:eth + past.arrests:pop)
+stan.glm.9 <- update(stan.glm.6, formula = stops~past.arrests+ pop_prop+ eth+ past.arrests:eth+ pop_prop:eth)
+```
+
+```{r}
+#posterior predictive check 
+loo1 <- loo(stan.glm.1, save_psis = TRUE)
+loo2 <- loo(stan.glm.2, save_psis = TRUE)
+loo3 <- loo(stan.glm.3, save_psis = TRUE)
+loo4 <- loo(stan.glm.4, save_psis = TRUE)
+loo5 <- loo(stan.glm.5, save_psis = TRUE)
+loo6 <- loo(stan.glm.6, save_psis = TRUE)
+loo7 <- loo(stan.glm.7, save_psis = TRUE)
+loo8 <- loo(stan.glm.8, save_psis = TRUE)
+loo9 <- loo(stan.glm.9, save_psis = TRUE)
+```
+```{r}
+rstanarm::loo_compare(loo1, loo2, loo3, loo4, loo5, loo6, loo7, loo8,loo9) 
 ```
