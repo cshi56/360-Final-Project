@@ -266,25 +266,20 @@ In the mean and variances seen above, we can clearly see that the variance value
 
 # Modeling
 
-For each crime type, we are going to fit 3 models initially, where each $\beta$ will be the coefficient for which we will derive a posterior distribution for. All models will be fit with a negative binomial sampling model as motivated by the EDA; and all models will be fit with a Cauchy prior with a location (or center) parameter of 0 and a scale of 2.5, in which the intercept and regression coefficients will be further autoscaled by the `stan_glm()` function for further standardization. This prior is proposed by the Gelman paper. 
+For each crime type, we are going to fit 3 models initially, where each $\beta$ will be the coefficient for which we will derive a posterior distribution for. All models will be fit with a negative binomial sampling model as motivated by the EDA; and all models will be fit with a Cauchy prior with a location (or center) parameter of 0 and a scale of 2.5. This prior is proposed by the Gelman paper. 
 
 Model 1:
 $$
 log(mean(stops)) = log(past.arrests)+\beta_0+\beta_1*eth + \beta_2 *pop\_prop + \beta_3*(eth:pop\_prop)
 $$
-Model 2:
-$$
-log(mean(stops)) = \beta_0+\beta_1*eth + \beta_2 *pop\_prop + \beta_3*past.arrests + \beta_4 *(eth:past.arrests) +\beta_5*(eth:pop\_prop) + \beta_6*(pop\_prop:past.arrests)
-$$
-
-Model 3: 
+Model 2: 
 $$
 log(mean(stops)) = \beta_0+\beta_1*eth + \beta_2 *pop\_prop + \beta_3*crime\_prop + \beta_4 *(eth:crime\_prop) +\beta_5*(eth:pop\_prop) + \beta_6*(pop\_prop:crime\_prop)
 $$
 
 Note that `crime_prop` is a variable calculated from the number of past arrests for an ethnic group in a precinct for a particular crime divided by the total past arrests in a precinct for a particular crime. This adjusts the `past.arrests` variable for the number of crimes in the overall precinct (i.e. in a precinct/area of higher crime counts overall, there might be more past arrests for a particular ethnic group as well.)
 
-From the above 3 models, we will use both the looIC and Bayes' Factor diagnostic to determine which base model has the most predictive power. 
+From the above 2 models, we will use both the looIC and Bayes' Factor diagnostic to determine which base model has the most predictive power. 
 The looIC diagnostic is a model comparison measure. When comparing two fitted models, we can estimate the difference in their expected predictive accuracy by the difference in elpd_loo or elpd_waic (or multiplied by -2, if desired, to be on the deviance scale). When that difference, elpd_diff, is positive then the expected predictive accuracy for the second model is higher. A negative elpd_diff favors the first model.
 Similarly, Bayes' Factor diagnostic also allows us to compare the predictive performance of different models. A Bayes factor greater than 1 can be interpreted as evidence against the null, at which one convention is that a Bayes factor greater than 3 can be considered as "substantial" evidence against the null (and vice versa, a Bayes factor smaller than 1/3 indicates substantial evidence in favor of the null-model) (Wetzels et al. 2011).
 
@@ -298,62 +293,50 @@ model.1 <- stan_glm(data = violent_crime,
                     family = neg_binomial_2(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm1.csv"))
 ```
 
 ```{r}
 model.2 <- stan_glm(data = violent_crime,
-                    formula = stops ~ eth * (past.arrests + pop_prop) +
-                      pop_prop * past.arrests,
-                    family = neg_binomial_2(link = "log"),
-                    seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE), 
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm2.csv"))
-```
-
-```{r}
-model.3 <- stan_glm(data = violent_crime,
                     formula = stops ~ eth * (crime_prop + pop_prop) + 
                       pop_prop * crime_prop,
                     family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     seed = 360,
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm3.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2), loo(model.3))
+rstanarm::loo_compare(loo(model.1), loo(model.2))
 ```
 ```{r}
-bayesfactor_models(model.1, model.2, model.3, denominator = model.1)
+bayesfactor_models(model.1, model.2, denominator = model.1)
 ```
 
-Clearly model.1 yielded the best result above as we see that the elpd_diff is negative for both model.2 and model.3, and that the Bayes' Factor has little evidence to suggest that model.2 or model.3 are indeed better than model.1 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.1 is better.
+Clearly model.1 yielded the best result above as we see that the elpd_diff is negative for model.2, and that the Bayes' Factor has little evidence to suggest that model.2 are indeed better than model.1 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.1 is better.
 
 ```{r}
-model.4 <- stan_glm(data = violent_crime,
+model.3 <- stan_glm(data = violent_crime,
                     formula = stops ~ eth * pop_prop,
                     family = poisson(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm4.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.4))
+rstanarm::loo_compare(loo(model.1), loo(model.3))
 ```
 ```{r}
-bayesfactor_models(model.1, model.4, denominator = model.1) #??model.4 is better
+bayesfactor_models(model.1, model.3, denominator = model.1)
 ```
 Note that our base model model 1 contains a formula in which all covariates were deemed significant in the EDA, therefore no further comparison needs to be made. 
 
@@ -370,62 +353,50 @@ model.1 <- stan_glm(data = weapon_crime,
                     family = neg_binomial_2(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm1.csv"))
 ```
 
 ```{r}
 model.2 <- stan_glm(data =  weapon_crime,
-                    formula = stops ~ eth * (past.arrests + pop_prop) +
-                      pop_prop * past.arrests,
-                    family = neg_binomial_2(link = "log"),
-                    seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE), 
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm2.csv"))
-```
-
-```{r}
-model.3 <- stan_glm(data =  weapon_crime,
                     formula = stops ~ eth * (crime_prop + pop_prop) + 
                       pop_prop * crime_prop,
                     family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
                     seed = 360,
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm3.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2), loo(model.3))
+rstanarm::loo_compare(loo(model.1), loo(model.2))
 ```
 ```{r}
-bayesfactor_models(model.1, model.2, model.3, denominator = model.1)
+bayesfactor_models(model.1, model.2,denominator = model.1)
 ```
 
-Clearly model.1 yielded the best result above as we see that the elpd_diff is negative for both model.2 and model.3, and that the Bayes' Factor has little evidence to suggest that model.2 or model.3 are indeed better than model.1 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.1 is better.
+Clearly model.1 yielded the best result above as we see that the elpd_diff is negative for model.2, and that the Bayes' Factor has little evidence to suggest that model.2 are indeed better than model.1 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.1 is better.
 
 ```{r}
-model.4 <- stan_glm(data =  weapon_crime,
+model.3 <- stan_glm(data =  weapon_crime,
                     formula = stops ~ eth * pop_prop,
                     family = poisson(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm4.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.4))
+rstanarm::loo_compare(loo(model.1), loo(model.3))
 ```
 ```{r}
-bayesfactor_models(model.1, model.4, denominator = model.1)
+bayesfactor_models(model.1, model.3, denominator = model.1)
 ```
 Note that our base model model 1 contains a formula in which all covariates were deemed significant in the EDA, therefore no further comparison needs to be made. 
 
@@ -442,38 +413,27 @@ weapon_model <- model.1
 #cannot modify the entry to be 0.001 since past.arrests has to be integer
 #attempting model 1a where we ignore the 0 entry
 df <- property_crime %>%
-  filter(past.arrests != 0)
-
+  mutate(past.arrests = if_else(past.arrests!= 0, past.arrests, as.integer(1)))
+```
+```{r}
 model.1 <- stan_glm(data = df,
                     formula = stops ~ eth * pop_prop,
                     family = neg_binomial_2(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     refresh = 0,
                     diagnostic_file = file.path(tempdir(), "glm1.csv"))
 ```
 
 ```{r}
-model.2 <- stan_glm(data =  property_crime,
-                    formula = stops ~ eth * (past.arrests + pop_prop) +
-                      pop_prop * past.arrests,
-                    family = neg_binomial_2(link = "log"),
-                    seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE), 
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm2.csv"))
-```
-
-```{r}
-model.3 <- stan_glm(data =  property_crime,
+model.2 <- stan_glm(data = df,
                     formula = stops ~ eth * (crime_prop + pop_prop) + 
                       pop_prop * crime_prop,
                     family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     seed = 360,
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm3.csv"))
@@ -481,53 +441,52 @@ model.3 <- stan_glm(data =  property_crime,
 
 ```{r}
 #cannot compare model 1 because model 1 has different number of data points
-rstanarm::loo_compare(loo(model.2), loo(model.3))
+rstanarm::loo_compare(loo(model.1), loo(model.2))
 ```
 ```{r}
-bayesfactor_models(model.2, model.3, denominator = model.3) #model 2 is better??
+bayesfactor_models(model.1, model.2, denominator = model.2) 
 ```
 
 ```{r}
-model.4 <- stan_glm(data = property_crime,
+model.3 <- stan_glm(data = property_crime,
                     formula = stops ~ eth * (crime_prop + pop_prop) + 
                       pop_prop * crime_prop,
                     family = poisson(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE), 
-                    #(if use autoscale, does not converge)
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5), 
+                    prior_intercept = cauchy(0, 2.5),
                     seed = 360,
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm4.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.3), loo(model.4))
+rstanarm::loo_compare(loo(model.2), loo(model.3))
 ```
 
 ```{r}
-bayesfactor_models(model.3, model.4, denominator = model.3) #model 4 is better?
+bayesfactor_models(model.2, model.3, denominator = model.2)
 ```
 
 ```{r}
-model.5 <- stan_glm(data = property_crime,
+model.4 <- stan_glm(data = property_crime,
                     formula = stops ~ eth * (crime_prop + pop_prop),
                     family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     seed = 360,
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm3.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.3), loo(model.5))
+rstanarm::loo_compare(loo(model.2), loo(model.4))
 ```
 ```{r}
-bayesfactor_models(model.3, model.5, denominator = model.3) #model 5 is better?
+bayesfactor_models(model.2, model.4, denominator = model.2)
 ```
 
 ```{r}
-property_model <- model.3
+property_model <- model.2
 ```
 
 ## Drug Crimes
@@ -539,85 +498,72 @@ model.1 <- stan_glm(data = drug_crime,
                     family = neg_binomial_2(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm1.csv"))
 ```
 
 ```{r}
 model.2 <- stan_glm(data = drug_crime,
-                    formula = stops ~ eth * (past.arrests + pop_prop) +
-                      pop_prop * past.arrests,
-                    family = neg_binomial_2(link = "log"),
-                    seed = 360,
-                    prior = cauchy(0, 2.5, autoscale = TRUE), 
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm2.csv"))
-```
-
-```{r}
-model.3 <- stan_glm(data = drug_crime,
                     formula = stops ~ eth * (crime_prop + pop_prop) + 
                       pop_prop * crime_prop,
                     family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     seed = 360,
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm3.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2), loo(model.3))
+rstanarm::loo_compare(loo(model.1), loo(model.2))
 ```
 ```{r}
-bayesfactor_models(model.3, model.1, model.2, denominator = model.3)
+bayesfactor_models(model.1, model.2, denominator = model.2)
 ```
 
-Clearly model.3 yielded the best result above as we see that the elpd_diff is negative for both model.1 and model.2, and that the Bayes' Factor has little evidence to suggest that model.1 or model.2 are indeed better than model.3 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.3 is better.
+Clearly model.2 yielded the best result above as we see that the elpd_diff is negative for model.1, and that the Bayes' Factor has little evidence to suggest that model.1 are indeed better than model.2 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.2 is better.
 
 ```{r}
-model.4 <- stan_glm(data = drug_crime,
+model.3 <- stan_glm(data = drug_crime,
                     formula = stops ~ eth * (crime_prop + pop_prop) + 
                       pop_prop * crime_prop,
                     family = poisson(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    #(if use autoscale, does not converge)
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     seed = 360,
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm4.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.3), loo(model.4))
+rstanarm::loo_compare(loo(model.2), loo(model.3))
 ```
 ```{r}
-bayesfactor_models(model.3, model.4, denominator = model.3) #model 4 is better?
+bayesfactor_models(model.2, model.3, denominator = model.2)
 ```
 
 ```{r}
-model.5 <- stan_glm(data = drug_crime,
+model.4 <- stan_glm(data = drug_crime,
                     formula = stops ~ eth * (crime_prop + pop_prop),
                     family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5, autoscale = TRUE),
-                    prior_intercept = cauchy(0, 2.5, autoscale = TRUE),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
                     seed = 360,
                     refresh = 0,
                    diagnostic_file = file.path(tempdir(), "glm3.csv"))
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.3), loo(model.5))
+rstanarm::loo_compare(loo(model.2), loo(model.4))
 ```
 ```{r}
-bayesfactor_models(model.3, model.5, denominator = model.3) #model 5 is better?
+bayesfactor_models(model.2, model.4, denominator = model.2)
 ```
 
 ```{r}
-drug_model <- model.3
+drug_model <- model.2
 ```
 
 ## Posterior Diagnostics
