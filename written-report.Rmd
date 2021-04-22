@@ -189,27 +189,6 @@ ggplot(data = stop, mapping = aes(x = eth, y = past.arrests, fill = crime)) +
 #### Violent Crimes 
 
 ```{r}
-#clean datasets and add interaction 
-stop.1<- stop.1 %>% ungroup() %>%
-  dplyr::select(-crime, -stops_in_precinct,
-                                  -total_pop, -precinct) %>%
-  mutate(eth = as.numeric(eth)) %>%
-  mutate(int_pop_pastarrests = pop*past.arrests, 
-         int_pop_eth = pop*eth,
-         int_pastarrests_eth = past.arrests*eth,  
-         int_pastarrests_popprop = past.arrests*pop_prop, 
-         int_crimerate_eth = crime_rate*eth, #1
-         int_popprop_eth = pop_prop*eth, #2
-         int_crimerate_popprop = crime_rate*pop_prop) %>%
-  mutate(eth = factor(eth))
-```
-
-```{r}
-stop.1.model1 <- stop.1 %>% 
-  dplyr::select()
-```
-
-```{r}
 #glm for crime 1; done for testing only. don't repeat the code for other crimes yet. 
 #assuming negative binom sampling model
 
@@ -238,27 +217,6 @@ stan.glm.2 <- stan_glm(data = stop.1,
 stan.glm.3 <- update(stan.glm.2, formula = stops ~ past.arrests+ pop+ eth+ 
                        past.arrests:eth+ pop:eth + past.arrests:pop,
                    diagnostic_file = file.path(tempdir(), "glm.csv"))
-```
-
-```{r}
-#bayes factor backward selection 
-removeCovariate <- function(df, remove) {
-  #remove one covariate from model1
-  df.temp <- df %>%dplyr::select(-remove) 
-  #specify new model which omits the removed variable
-  model <-  stan_glm(data = df.temp,
-                   formula = stops ~ .,  #how do we add interaction?
-                   family = neg_binomial_2, #how do I justify not having a prior? 
-                   seed = 360,
-                   refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm.csv"))
-  return(model)
-}
-bfSelection <- function() {
-  
-} 
-
-
 ```
 
 
