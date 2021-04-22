@@ -1,6 +1,6 @@
 ---
 title: "360 Final Project"
-author: "Chen Shi"
+author: "Chen Shi, Belle Xu"
 date: "4/21/2021"
 output: pdf_document
 ---
