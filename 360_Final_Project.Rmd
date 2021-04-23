@@ -228,8 +228,8 @@ violent_crime <- stop %>%
          pop_prop = pop / total_pop,
          total_arrest = sum(past.arrests),
          crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) %>%
-  select(-crime, -total_pop, -total_arrest, -precinct)
+  ungroup(precinct) #%>%
+  #select(-crime, -total_pop, -total_arrest, -precinct)
 
 weapon_crime <- stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
@@ -241,8 +241,8 @@ weapon_crime <- stop %>%
          pop_prop = pop / total_pop,
          total_arrest = sum(past.arrests),
          crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) %>%
-  select(-crime, -total_pop, -total_arrest, -precinct)
+  ungroup(precinct) #%>%
+  #select(-crime, -total_pop, -total_arrest, -precinct)
 
 property_crime <- stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
@@ -254,8 +254,8 @@ property_crime <- stop %>%
          pop_prop = pop / total_pop,
          total_arrest = sum(past.arrests),
          crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) %>%
-  select(-crime, -total_pop, -total_arrest, -precinct)
+  ungroup(precinct) #%>%
+  #select(-crime, -total_pop, -total_arrest, -precinct)
 
 drug_crime <- stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
@@ -267,8 +267,14 @@ drug_crime <- stop %>%
          pop_prop = pop / total_pop,
          total_arrest = sum(past.arrests),
          crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) %>%
-  select(-crime, -total_pop, -total_arrest, -precinct)
+  ungroup(precinct) #%>%
+  #select(-crime, -total_pop, -total_arrest, -precinct)
+```
+
+
+```{r}
+total_crime <- rbind(violent_crime, weapon_crime, property_crime, drug_crime) %>%
+  mutate(past.arrests = if_else(past.arrests!= 0, past.arrests, as.integer(1)))
 ```
 
 ```{r}
@@ -299,15 +305,10 @@ Justification for choosing covariates:
 
 For each crime type, we are going to fit 2 models initially, where each $\beta$ will be the coefficient for which we will derive a posterior distribution for. All models will be fit with a negative binomial sampling model as motivated by the EDA; and all models will be fit with a Cauchy prior with a location (or center) parameter of 0 and a scale of 2.5. This prior is proposed by the Gelman paper. 
 
-Model 1:
+Model:
 $$
-log(mean(stops)) = log(past.arrests)+\beta_0+\beta_1*eth + \beta_2 *pop\_prop + \beta_3*(eth:pop\_prop)
+log(mean(stops)) = log(past.arrests)+\beta_0+\beta_1*eth + \beta_2 *pop\_prop + \beta_3*crime\_type + \beta_4 *(eth:pop\_prop) + \beta_5*(crime\_type*pop\_prop) + \beta_6*(eth:crime\_type)
 $$
-Model 2: 
-$$
-log(mean(stops)) = \beta_0+\beta_1*eth + \beta_2 *pop\_prop + \beta_3*crime\_prop + \beta_4 *(eth:crime\_prop) +\beta_5*(eth:pop\_prop) + \beta_6*(pop\_prop:crime\_prop)
-$$
-
 From the above 2 models, we will use both the looIC and Bayes' Factor diagnostic to determine which base model has the most predictive power. 
 The Bayes' Factor diagnostic allows us to test under which model the observed data are more probable by comparing the marginal likelihood of the two models. A Bayes' Factor greater than 1 can be interpreted as that we have enough evidence to claim against the null (which is the hypothesis that some model $\mathcal{M}_1$ is better than $\mathcal{M}_2$)(Wetzels et al. 2011). However, this measure has some ambiguity as the two models proposed above do not have the same amount of covariates, therefore they do not have the same amount of coefficients; one can also further argue that, for model 1, we are in fact modeling for $log(mean(stops)/past.arrests)$ as opposed to the response variable $log(mean(stops))$ in model 2. Therefore, we choose to adjust for this ambiguity by using looIC as a second measure.  
 
@@ -315,11 +316,175 @@ The looIC diagnostic is a model comparison measure for the two models' predictiv
 
 After selecting the optimal base model, we will compare it with its Poisson sampling model variant to ensure that our current base model indeed captures the overdispersion better than the Poisson sampling model. We will not be examining potential models where certain main effects or interactions gets dropped from the base model we chose earlier. This is because all main effects and interactions have shown to have obvious interactions and relationships through our EDA; even if their interaction may not be statistically significant, we still need to keep these covariates in order to adjust for the coefficients of other covariates present in the model. 
 
-## Violent Crimes
+
+## Total Crime
 
 ```{r}
-model.1 <- stan_glm(data = violent_crime,
-                    formula = stops ~ eth * pop_prop,
+cov.model.1 <- stan_glm(data = total_crime,
+                    formula = stops ~ eth * (crime_prop + pop_prop + crime) + 
+                      pop_prop * crime_prop + pop_prop * crime + crime_prop * crime,
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+cov.model.2 <- stan_glm(data = total_crime,
+                    formula = stops ~ eth * (crime_prop + pop_prop + crime) + 
+                      pop_prop * crime_prop + pop_prop * crime,
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+bayesfactor_models(cov.model.1, cov.model.2, denominator = cov.model.2)
+```
+
+```{r}
+rstanarm::loo_compare(loo(cov.model.1), loo(cov.model.2))
+```
+```{r}
+cov.model.3 <- stan_glm(data = total_crime,
+                    formula = stops ~ eth * (crime_prop + pop_prop + crime) + 
+                      pop_prop * crime_prop,
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+bayesfactor_models(cov.model.2, cov.model.3, denominator = cov.model.3)
+```
+
+```{r}
+rstanarm::loo_compare(loo(cov.model.2), loo(cov.model.3))
+```
+
+```{r}
+new.cov.model.1 <- stan_glm(data = total_crime,
+                    formula = stops ~ log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime,
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+rstanarm::loo_compare(loo(new.cov.model.1), loo(cov.model.1), loo(cov.model.3))
+```
+
+```{r}
+new.cov.model.2 <- stan_glm(data = total_crime,
+                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + eth*log(past.arrests) + pop_prop*log(past.arrests) + crime*log(past.arrests),
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+round(coef(new.cov.model.2), 3)
+round(posterior_interval(new.cov.model.2, prob = 0.95), 3)
+```
+
+```{r}
+bayesfactor_models(new.cov.model.1, new.cov.model.2, denominator = new.cov.model.2)
+```
+
+```{r}
+rstanarm::loo_compare(loo(new.cov.model.1), loo(new.cov.model.2))
+```
+```{r}
+new.cov.model.3 <- stan_glm(data = total_crime,
+                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + eth*log(past.arrests) + pop_prop*log(past.arrests),
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+bayesfactor_models(new.cov.model.3, new.cov.model.2, denominator = new.cov.model.3)
+```
+
+```{r}
+rstanarm::loo_compare(loo(new.cov.model.3), loo(new.cov.model.2))
+```
+
+```{r}
+new.cov.model.4 <- stan_glm(data = total_crime,
+                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + eth*log(past.arrests) + crime*log(past.arrests),
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+bayesfactor_models(new.cov.model.4, new.cov.model.2, denominator = new.cov.model.4)
+```
+
+```{r}
+rstanarm::loo_compare(loo(new.cov.model.2), loo(new.cov.model.4))
+```
+
+
+```{r}
+new.cov.model.5 <- stan_glm(data = total_crime,
+                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + pop_prop*log(past.arrests) + crime*log(past.arrests),
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+bayesfactor_models(new.cov.model.5, new.cov.model.2, denominator = new.cov.model.2)
+```
+
+```{r}
+rstanarm::loo_compare(loo(new.cov.model.2), loo(new.cov.model.5))
+```
+```{r}
+new.cov.model.6 <- stan_glm(data = total_crime,
+                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime)  + pop_prop*log(past.arrests) + crime*log(past.arrests),
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+```{r}
+rstanarm::loo_compare(loo(new.cov.model.2), loo(new.cov.model.6))
+```
+
+## offset models 
+
+
+```{r}
+model.1 <- stan_glm(data = total_crime,
+                    formula = stops ~ eth * (pop_prop + crime) + pop_prop * crime,
                     family = neg_binomial_2(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
@@ -330,56 +495,8 @@ model.1 <- stan_glm(data = violent_crime,
 ```
 
 ```{r}
-model.2 <- stan_glm(data = violent_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop) + 
-                      pop_prop * crime_prop,
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2))
-```
-```{r}
-bayesfactor_models(model.1, model.2, denominator = model.1)
-```
-
-Clearly model.1 yielded the best result above as we see that the elpd_diff is negative for model.2, and that the Bayes' Factor has little evidence to suggest that model.2 are indeed better than model.1 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.1 is better.
-
-```{r}
-model.3 <- stan_glm(data = violent_crime,
-                    formula = stops ~ eth * pop_prop,
-                    family = poisson(link = "log"),
-                    offset = log(past.arrests),
-                    seed = 360,
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm4.csv"))
-```
-
-```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.3))
-```
-```{r}
-bayesfactor_models(model.1, model.3, denominator = model.1)
-```
-Note that our base model model 1 contains a formula in which all covariates were deemed significant in the EDA, therefore no further comparison needs to be made. 
-
-```{r}
-violent_model <- model.1
-```
-
-## Weapon Crimes
-
-
-```{r}
-model.1 <- stan_glm(data = weapon_crime,
-                    formula = stops ~ eth * pop_prop,
+model.2 <- stan_glm(data = total_crime,
+                    formula = stops ~ eth * (pop_prop + crime),
                     family = neg_binomial_2(link = "log"),
                     offset = log(past.arrests),
                     seed = 360,
@@ -389,172 +506,53 @@ model.1 <- stan_glm(data = weapon_crime,
                    diagnostic_file = file.path(tempdir(), "glm1.csv"))
 ```
 
-```{r}
-model.2 <- stan_glm(data =  weapon_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop) + 
-                      pop_prop * crime_prop,
-                    family = neg_binomial_2(link = "log"),
-                    seed = 360,
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
 
-```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2))
-```
-```{r}
-bayesfactor_models(model.1, model.2,denominator = model.1)
-```
-
-Clearly model.1 yielded the best result above as we see that the elpd_diff is negative for model.2, and that the Bayes' Factor has little evidence to suggest that model.2 are indeed better than model.1 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.1 is better.
-
-```{r}
-model.3 <- stan_glm(data =  weapon_crime,
-                    formula = stops ~ eth * pop_prop,
-                    family = poisson(link = "log"),
-                    offset = log(past.arrests),
-                    seed = 360,
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm4.csv"))
-```
-
-```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.3))
-```
-```{r}
-bayesfactor_models(model.1, model.3, denominator = model.1)
-```
-Note that our base model model 1 contains a formula in which all covariates were deemed significant in the EDA, therefore no further comparison needs to be made. 
-
-```{r}
-weapon_model <- model.1
-```
-
-
-## Property Crimes
-
-
-```{r}
-df <- property_crime %>%
-  mutate(past.arrests = if_else(past.arrests!= 0, past.arrests, as.integer(1)))
-```
-```{r}
-model.1 <- stan_glm(data = df,
-                    formula = stops ~ eth * pop_prop,
-                    family = neg_binomial_2(link = "log"),
-                    offset = log(past.arrests),
-                    seed = 360,
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    refresh = 0,
-                    diagnostic_file = file.path(tempdir(), "glm1.csv"))
-```
-
-```{r}
-model.2 <- stan_glm(data = df,
-                    formula = stops ~ eth * (crime_prop + pop_prop) + 
-                      pop_prop * crime_prop,
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2))
-```
-```{r}
-bayesfactor_models(model.1, model.2, denominator = model.2) 
-```
-
-```{r}
-model.3 <- stan_glm(data = property_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop) + 
-                      pop_prop * crime_prop,
-                    family = poisson(link = "log"),
-                    prior = cauchy(0, 2.5), 
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm4.csv"))
-```
-
-```{r}
-rstanarm::loo_compare(loo(model.2), loo(model.3))
-```
-
-```{r}
-bayesfactor_models(model.2, model.3, denominator = model.2)
-```
-```{r}
-property_model <- model.2
-```
-
-In the model above, we chose to modify the `past.arrests` value from 0 to 1 for one of the observations recording property crimes. We chose to make this modification because our proposed model 1 would not allow us to have 0 entries for `past.arrests`. We did not omit this entry because we still need to account for the variability in population proportion and crime proportion in that precinct for all ethnic groups. If we did not make the adjustment from 0 to 1, we would be ruling out the possibility that people described in that particular observation has ever been arrested for a property crime. Therefore, it is safe to assume that at least 1 person in this particular group has been arrested for a property crime in the past.  
-
-## Drug Crimes
-
-
-```{r}
-model.1 <- stan_glm(data = drug_crime,
-                    formula = stops ~ eth * pop_prop,
-                    family = neg_binomial_2(link = "log"),
-                    offset = log(past.arrests),
-                    seed = 360,
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm1.csv"))
-```
-
-```{r}
-model.2 <- stan_glm(data = drug_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop) + 
-                      pop_prop * crime_prop,
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2))
-```
 ```{r}
 bayesfactor_models(model.1, model.2, denominator = model.2)
 ```
 
-Clearly model.2 yielded the best result above as we see that the elpd_diff is negative for model.1, and that the Bayes' Factor has little evidence to suggest that model.1 are indeed better than model.2 in terms of posterior predictive performance. The small se_diff compiled with our small sample size of 225 may indicate that the performance difference between those three models may not differ too drastically; however, we can still reasonably claim that model.2 is better.
-
 ```{r}
-model.3 <- stan_glm(data = drug_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop) + 
-                      pop_prop * crime_prop,
-                    family = poisson(link = "log"),
+model.3 <- stan_glm(data = total_crime,
+                    formula = stops ~ eth * pop_prop + crime,
+                    family = neg_binomial_2(link = "log"),
+                    offset = log(past.arrests),
+                    seed = 360,
                     prior = cauchy(0, 2.5),
                     prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
                     refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm4.csv"))
+                   diagnostic_file = file.path(tempdir(), "glm1.csv"))
+```
+
+
+```{r}
+bayesfactor_models(model.3, model.2, denominator = model.3)
 ```
 
 ```{r}
-rstanarm::loo_compare(loo(model.2), loo(model.3))
+model.4 <- stan_glm(data = total_crime,
+                    formula = stops ~ eth + pop_prop + crime,
+                    family = neg_binomial_2(link = "log"),
+                    offset = log(past.arrests),
+                    seed = 360,
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm1.csv"))
+```
+
+
+```{r}
+bayesfactor_models(model.3, model.4, denominator = model.4)
 ```
 ```{r}
-bayesfactor_models(model.2, model.3, denominator = model.2)
+bayesfactor_models(model.2, model.4, denominator = model.4)
 ```
 
 ```{r}
-drug_model <- model.2
+bayesfactor_models(model.1, model.4, denominator = model.4)
+```
+```{r}
+rstanarm::loo_compare(loo(model.1), loo(model.2), loo(model.3), loo(model.4))
 ```
 
 ## Interpretations & Conclusion
@@ -562,81 +560,29 @@ drug_model <- model.2
 ### Violent
 
 ```{r}
-mcmc_areas(as.matrix(violent_model), prob = 0.95, prob_outer = 1)
-round(coef(violent_model), 3)
-round(posterior_interval(violent_model, prob = 0.95), 3)
-```
-As we can see in both the posterior distribution graphs as well as the estimated coefficients and 95% credible intervals above, the coefficients for covariates `eth`, `pop_prop`, as well as the interaction between `eth` and `pop_prop` are all estimated to be non-zero. This indicates that ethnic group, the population proportion of an ethnic group in a particular precinct, as well as the interaction between those two variables are significant in predicting the log of the mean number of stops for violent crimes for a particular ethnic group in a precinct after controlling the number of arrests for violent crimes in the past year in this precinct for a particular ethnic group. 
-
-From the `stan_glm()` manual page, we know that the coefficient estimates yielded above represents the posterior median values of each coefficient. Therefore, we can interpret the above coefficients as follows: 
-
-- We have an intercept estimate of -1.561. This means that, for the white ethnic group with 0 population proportion in a precinct (i.e. there are no people of white descent in this precinct), the mean number of stops for violent crimes in this precinct after controlling for the number of arrests for violent crimes in the past year for the white ethnic group is expected to be `r round(exp(-1.561),3)`.
-
-
-- The `eth1` estimate of 1.568 means that: for people of black ethnic group, the mean number of stops for violent crimes in a precinct after controlling for the number of arrests for violent crimes in the past year for the black ethnic group is expected to be `r round(exp(1.568), 3)` times the mean number of stops for violent crimes in the same precinct for the white ethnic group, holding their corresponding population proportion constant. This indicates blacks have about 156.8% higher chance of being stopped compared to whites. 
-
-- The `eth2` estimate of 1.071 means that: for people of hispanic ethnic group, the mean number of stops for violent crimes in a precinct after controlling for the number of arrests for violent crimes in the past year for the hispanic ethnic group is expected to be `r round(exp(1.071), 3)` times the mean number of stops for violent crimes in the same precinct for the white ethnic group, holding their corresponding population proportion constant. This indicates hispanics have about 107.1% higher chance of being stopped compared to whites.
-
-Note that in the results for the `eth` variable above, we could see that both people of black or hispanic descent have higher chance of being stopped than whites after controlling for the number of past arrests if we held their corresponding population proportion constant.  
-
-
-- The `pop_prop` estimate of 0.795 means that: For each additional unit(?????) in the population proportion of whites in a precinct, the mean number of stops for violent crimes for whites is expected to multiply by a factor of `r round(exp(0.341), 3)`, holding ethnic group constant. This positive correlation between the mean number of stops and ethnic group population proportion implies the relationship we have explored in the EDA, which is that if there were more people or high proportion of a particular ethnic group in a precinct, then people of this ethnic group will have a higher chance of being stopped. 
-
-- The `eth1:pop_prop` estimate of -2.050 means that: For blacks, the previously interpreted effect of population proportion on the mean number of stops in a precinct for violent crimes will decrease by a factor of `round(exp(-2.050),3)` compared to the white ethnic group.
-
-- The `eth2:pop_prop` estimate of -1.164 means that: For Hispanics, the previously interpreted effect of population proportion on the mean number of stops in a precinct for violent crimes will decrease by a factor of `round(exp(-2.050),3)` compared to the white ethnic group.
-
-In both of the interpretations above, we can see that the effect of population proportion for blacks or hispanics significantly decreases compared to whites. This would imply that, adjusting for the corresponding past number of arrests, population proportion play a much smaller role in determining whether a person will get stopped given the person is black or Hispanic. 
-
-From the interpretations above, we can see that, compared to whites, blacks and Hispanics have a higher chance of being stopped; and that population proportion plays a smaller role in determining whether they will get stopped. This significance could indicate potential bias in the stopping policy as a person is more likely to be stopped if they are of black or hispanic descents than if they are of white descent. Furthermore, we have also seen that the models which saw past number of arrests or crime proportion (by ethnic group in a precinc) as covariates did not have as strong of a posterior predictive performance compared to our current model. This could also indicate that, the number of past arrests or crime proportion has little effect in predicting the mean number of stops for violent crimes in a precinct for an ethnic group. Combining the previous three results, we can see a further emphasis placed on the role of ethnicity in a person's chances of being stopped over the population proportion or the past crime counts and proportions.  
-
-### Weapon
-
-```{r}
-mcmc_areas(as.matrix(weapon_model), prob = 0.95, prob_outer = 1)
-round(coef(weapon_model), 3)
-round(posterior_interval(weapon_model, prob = 0.95), 3)
+mcmc_areas(as.matrix(model.4), prob = 0.95, prob_outer = 1)
+round(coef(model.4), 3)
+round(posterior_interval(model.4, prob = 0.95), 3)
 ```
 
 ```{r}
-pp_check(weapon_model, plotfun = "stat_2d", stat = c("mean", "sd"))  
-pp_check(weapon_model, plotfun = "scatter_avg")
+pp_check(model.4, plotfun = "stat_2d", stat = c("mean", "sd"))  
+pp_check(model.4, plotfun = "scatter_avg")
 ```
-
-### Property
 
 ```{r}
-mcmc_areas(as.matrix(property_model), prob = 0.95, prob_outer = 1)
-round(coef(property_model), 3)
-round(posterior_interval(property_model, prob = 0.95), 3)
-```
-```{r}
-pp_check(property_model, plotfun = "stat_2d", stat = c("mean", "sd"))  
-pp_check(property_model, plotfun = "scatter_avg")
-```
-### Drug
-
-```{r}
-mcmc_areas(as.matrix(drug_model), prob = 0.95, prob_outer = 1)
-round(coef(drug_model), 3)
-round(posterior_interval(drug_model, prob = 0.95), 3)
-```
-```{r}
-pp_check(drug_model, plotfun = "stat_2d", stat = c("mean", "sd"))  
-pp_check(drug_model, plotfun = "scatter_avg")
+mcmc_areas(as.matrix(model.2), prob = 0.95, prob_outer = 1)
+round(coef(model.2), 3)
+round(posterior_interval(model.2, prob = 0.95), 3)
 ```
 
-## Posterior Diagnostics & Limitations
-
-### Violent
+```{r}
+pp_check(model.2, plotfun = "stat_2d", stat = c("mean", "sd"))  
+pp_check(model.2, plotfun = "scatter_avg")
+```
 
 ```{r}
-pp_check(violent_model, plotfun = "stat_2d", stat = c("mean", "sd"))  
-    # Scatterplot of two test statistics (capture the mean somewhat but 
-    # sd is kind of bad. at least it's not high sd)
-pp_check(violent_model, plotfun = "scatter_avg") # Scatterplot of y vs. average yrep (our model is good for predicting lower # of crimes)
-#more checks that doesn't need much interpretation to be added later on 
-#(i.e. acf, traceplot, density plot)
+pp_check(model.1, plotfun = "stat_2d", stat = c("mean", "sd")) 
+pp_check(cov.model.1, plotfun = "stat_2d", stat = c("mean", "sd")) 
+pp_check(cov.model.3, plotfun = "stat_2d", stat = c("mean", "sd")) 
 ```
-As seen in the first scatterplot above, the mean and standard deviation of our posterior predictive samples are plotted against our original data. It seems that our model would overpredict both the mean and standard deviation, though the cluster still captures the observed data. 
-Our model can be further examined in the second scatterplot, which plots the mean posterior predictive samples against our original data. A perfect model would have its points clustered around the diagonal line in the graph. The points in this plot are clustered to the diagonal line in lower values, yet becomes more and more dispersed in higher values. This indicates that our model is sufficient in predicting the mean number of stops for violent crimes in a ethnic group after adjusting for the number of past arrests for this ethnic group for violent crimes given that the number of stops here is small. However, for larger number of crimes, further information and data needs to be collected in order to hone our model further to account for the overdispersion. 
