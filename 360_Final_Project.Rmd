@@ -35,26 +35,8 @@ stop %>%
   geom_bar(position = "fill", stat = "identity") +
   geom_hline(yintercept = 1/3, linetype=5) +
   geom_hline(yintercept = 2/3, linetype=5) +
-  labs(y = "Proportion of stops", x = "Precinct", 
+  labs(y = "Proportion of Stops", x = "Precinct", 
        title = "Proportion of Stops per Precinct by Ethnicity")+
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  scale_fill_discrete(name = "Ethnicity",
-                      labels=c("White", "Black", "Hispanic"),
-                      type = c("#b7ee47","#ff6b6b","#4ebaba"))
-```
-
-```{r fig.width=12, fig.height=4}
-stop %>% 
-  mutate(eth = factor(eth, levels = c("3", "1", "2")),
-         precinct = factor(precinct)) %>%
-  group_by(eth, precinct) %>%
-  ggplot(mapping = aes(x = precinct, y = pop, fill = eth)) +
-  geom_bar(position = "fill", stat = "identity") +
-  geom_hline(yintercept = 1/3, linetype=5) +
-  geom_hline(yintercept = 2/3, linetype=5) +
-  labs(title = "Proportion of Population per Precinct by Ethnicity",
-         y = "Proportion of Population", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Ethnicity",
@@ -81,22 +63,22 @@ stop %>%
                       type = c("#b7ee47","#ff6b6b","#4ebaba"))
 ```
 
-
 ```{r fig.width=12, fig.height=4}
-stop %>%
+stop %>% 
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
-         precinct = factor(precinct),
-         crime = factor(crime)) %>%
-  filter(eth == "1") %>%
-  ggplot(mapping = aes(x = precinct, y = past.arrests, fill = crime)) +
+         precinct = factor(precinct)) %>%
+  group_by(eth, precinct) %>%
+  ggplot(mapping = aes(x = precinct, y = pop, fill = eth)) +
   geom_bar(position = "fill", stat = "identity") +
-  labs(title = "Proportion of Past Arrests (Black) per Precinct by Crime Type", 
-       y = "Proportion of Past Arrests", x = "Precinct") +
+  geom_hline(yintercept = 1/3, linetype=5) +
+  geom_hline(yintercept = 2/3, linetype=5) +
+  labs(title = "Proportion of Population per Precinct by Ethnicity",
+         y = "Proportion of Population", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
-  scale_fill_discrete(name = "Crime",
-                      labels=c("Violent", "Weapons", "Property", "Drug"),
-                      type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
+  scale_fill_discrete(name = "Ethnicity",
+                      labels=c("White", "Black", "Hispanic"),
+                      type = c("#b7ee47","#ff6b6b","#4ebaba"))
 ```
 
 
@@ -116,17 +98,15 @@ stop %>%
                       labels=c("Violent", "Weapons", "Property", "Drug"),
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
-
-
 ```{r fig.width=12, fig.height=4}
 stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
          precinct = factor(precinct),
          crime = factor(crime)) %>%
-  filter(eth == "2") %>%
+  filter(eth == "1") %>%
   ggplot(mapping = aes(x = precinct, y = past.arrests, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
-  labs(title = "Proportion of Past Arrests (Hispanic) per Precinct by Crime Type", 
+  labs(title = "Proportion of Past Arrests (Black) per Precinct by Crime Type", 
        y = "Proportion of Past Arrests", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
@@ -134,6 +114,7 @@ stop %>%
                       labels=c("Violent", "Weapons", "Property", "Drug"),
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
+
 ```{r fig.width=12, fig.height=4}
 stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
@@ -150,16 +131,15 @@ stop %>%
                       labels=c("Violent", "Weapons", "Property", "Drug"),
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
-
 ```{r fig.width=12, fig.height=4}
 stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
          precinct = factor(precinct),
          crime = factor(crime)) %>%
-  filter(eth == "3") %>%
+  filter(eth == "2") %>%
   ggplot(mapping = aes(x = precinct, y = past.arrests, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
-  labs(title = "Proportion of Past Arrests (White) per Precinct by Crime Type", 
+  labs(title = "Proportion of Past Arrests (Hispanic) per Precinct by Crime Type", 
        y = "Proportion of Past Arrests", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
@@ -167,6 +147,7 @@ stop %>%
                       labels=c("Violent", "Weapons", "Property", "Drug"),
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
+
 ```{r fig.width=12, fig.height=4}
 stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
@@ -183,29 +164,23 @@ stop %>%
                       labels=c("Violent", "Weapons", "Property", "Drug"),
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
-
-```{r}
+```{r fig.width=12, fig.height=4}
 stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
          precinct = factor(precinct),
          crime = factor(crime)) %>%
-  group_by(precinct) %>%
-  mutate(total_pop = sum(pop) / 4,
-         pop_prop = pop / total_pop,
-         total_arrest = sum(past.arrests),
-         crime_prop = past.arrests / total_arrest) %>%
-  group_by(eth, precinct) %>%
-  mutate(eth_crime = sum(crime_prop)) %>%
-  filter(crime == 1) %>%
-  ggplot(mapping = aes(x = pop_prop, y = eth_crime, color = eth)) +
-  geom_point() + theme_bw()+
-  labs(title="Past Arrests Prop.(All Crimes) vs. Population Prop. per Precinct",
-       x = "Population Proportion (per Precinct)",
-       y = "Past Arrests Proportion (All Crimes)") + 
-  scale_colour_discrete(name = "Ethnicity",
-                      labels=c("White", "Black", "Hispanic"),
-                      type = c("#9EBE00","#FD0006","#009B95"))
+  filter(eth == "3") %>%
+  ggplot(mapping = aes(x = precinct, y = past.arrests, fill = crime)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(title = "Proportion of Past Arrests (White) per Precinct by Crime Type", 
+       y = "Proportion of Past Arrests", x = "Precinct") +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  scale_fill_discrete(name = "Crime",
+                      labels=c("Violent", "Weapons", "Property", "Drug"),
+                      type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
+
 
 ```{r}
 stop %>%
@@ -224,6 +199,28 @@ stop %>%
   geom_point() + theme_bw()+
   labs(title = "Stop Proportion (All Stops) vs. Population Proportion per Precinct",
        x = "Population Proportion (per Precinct)", y = "Stop Proportion (All Stops)") + 
+  scale_colour_discrete(name = "Ethnicity",
+                      labels=c("White", "Black", "Hispanic"),
+                      type = c("#9EBE00","#FD0006","#009B95"))
+```
+```{r}
+stop %>%
+  mutate(eth = factor(eth, levels = c("3", "1", "2")),
+         precinct = factor(precinct),
+         crime = factor(crime)) %>%
+  group_by(precinct) %>%
+  mutate(total_pop = sum(pop) / 4,
+         pop_prop = pop / total_pop,
+         total_arrest = sum(past.arrests),
+         crime_prop = past.arrests / total_arrest) %>%
+  group_by(eth, precinct) %>%
+  mutate(eth_crime = sum(crime_prop)) %>%
+  filter(crime == 1) %>%
+  ggplot(mapping = aes(x = pop_prop, y = eth_crime, color = eth)) +
+  geom_point() + theme_bw()+
+  labs(title="Past Arrests Prop.(All Crimes) vs. Population Prop. per Precinct",
+       x = "Population Proportion (per Precinct)",
+       y = "Past Arrests Proportion (All Crimes)") + 
   scale_colour_discrete(name = "Ethnicity",
                       labels=c("White", "Black", "Hispanic"),
                       type = c("#9EBE00","#FD0006","#009B95"))
