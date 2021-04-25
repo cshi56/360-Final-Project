@@ -1,5 +1,6 @@
 ---
-title: "360 Final Project"
+title: "Investigating Racial Profiling"
+subtitle: "MCMC Modeling for the NYC Stop-and-Frisk Policy"
 author: "Chen Shi, Belle Xu"
 date: "4/21/2021"
 output: pdf_document
@@ -24,7 +25,7 @@ stop <- read.table("stop-and-frisk.dat", header = TRUE)
 # Exploratory Data Analysis
 
 ```{r fig.width=12, fig.height=4}
-# percentage of stops for each ethnicity in each precinct
+# Proportion of stops for each ethnicity in each precinct
 stop %>% 
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
          precinct = factor(precinct)) %>%
@@ -34,7 +35,7 @@ stop %>%
   geom_bar(position = "fill", stat = "identity") +
   geom_hline(yintercept = 1/3, linetype=5) +
   geom_hline(yintercept = 2/3, linetype=5) +
-  labs(y = "Percentage of stops", x = "Precinct", 
+  labs(y = "Proportion of stops", x = "Precinct", 
        title = "Proportion of Stops per Precinct by Ethnicity")+
   theme_bw() +
   theme(legend.position = "bottom") +
@@ -42,9 +43,6 @@ stop %>%
                       labels=c("White", "Black", "Hispanic"),
                       type = c("#b7ee47","#ff6b6b","#4ebaba"))
 ```
-It seems that in most precincts, Blacks and Hispanics represent a much higher percentage of stops than white. 
-
-Is it because there are more blacks and Hispanics in these precincts so the police have a high possibility of stopping members from these two ethnic groups?
 
 ```{r fig.width=12, fig.height=4}
 stop %>% 
@@ -56,17 +54,13 @@ stop %>%
   geom_hline(yintercept = 1/3, linetype=5) +
   geom_hline(yintercept = 2/3, linetype=5) +
   labs(title = "Proportion of Population per Precinct by Ethnicity",
-         y = "Percentage of Population", x = "Precinct") +
+         y = "Proportion of Population", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Ethnicity",
                       labels=c("White", "Black", "Hispanic"),
                       type = c("#b7ee47","#ff6b6b","#4ebaba"))
 ```
-
-In precincts where Blacks and Hispanics have larger population proportion, there is a corresponding higher proportion of stops for these two ethnic groups. However, in precincts where white accounts for a majority of the population, Blacks and Hispanics still account for high percentage of stops. (See precinct 1-12, 34-38, 40-42, 61-69). 
-
-Is race an important factor for a police's decision-making process in stopping a pedestrian? How about the crime rate (past arrests of an ethnic group / total past arrests)? 
 
 ```{r fig.width=12, fig.height=4}
 stop %>%
@@ -79,7 +73,7 @@ stop %>%
   geom_hline(yintercept = 1/3, linetype=5) +
   geom_hline(yintercept = 2/3, linetype=5) +
   labs(title = "Proportion of Past Arrests per Precinct by Ethnicity",
-       y = "Percentage of Past Arrests", x = "Precinct") +
+       y = "Proportion of Past Arrests", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Ethnicity",
@@ -87,30 +81,6 @@ stop %>%
                       type = c("#b7ee47","#ff6b6b","#4ebaba"))
 ```
 
-This plot looks similar to the first plot (for the proportion of stops). It seems that in most precincts, if there is a high percentage of past arrests for an ethnic group, there is also a high percentage of stops for that particular ethnic group. Is it possible that `past.arrests` or crime rate of an ethnic group is an important factor in determining whether the police stop members of that ethnic group? (The police might use `past.arrests` as an factor in decision-making process). 
-```{r}
-stop %>%
-  mutate(eth = factor(eth, levels = c("3", "1", "2")),
-         precinct = factor(precinct),
-         crime = factor(crime)) %>%
-  group_by(precinct) %>%
-  mutate(total_pop = sum(pop) / 4,
-         pop_prop = pop / total_pop,
-         total_arrest = sum(past.arrests),
-         crime_prop = past.arrests / total_arrest) %>%
-  group_by(eth, precinct) %>%
-  mutate(eth_crime = sum(crime_prop)) %>%
-  filter(crime == 1) %>%
-  ggplot(mapping = aes(x = pop_prop, y = eth_crime, color = eth)) +
-  geom_point() + theme_bw()+
-  labs(title = "Crime Proportion (All Crimes) vs. Population Proportion per Precinct",
-       y = "Population Proportion (per Precinct)", x = "Crime Proportion (All Crimes)") + 
-  scale_colour_discrete(name = "Ethnicity",
-                      labels=c("White", "Black", "Hispanic"),
-                      type = c("#9EBE00","#FD0006","#009B95"))
-```
-
-Is crime type an important factor? For example, are white people more likely to be stopped for drug crime if they are arrested in the past most for drug crime? 
 
 ```{r fig.width=12, fig.height=4}
 stop %>%
@@ -121,13 +91,15 @@ stop %>%
   ggplot(mapping = aes(x = precinct, y = past.arrests, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
   labs(title = "Proportion of Past Arrests (Black) per Precinct by Crime Type", 
-       y = "Percentage of Past Arrests", x = "Precinct") +
+       y = "Proportion of Past Arrests", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Crime",
                       labels=c("Violent", "Weapons", "Property", "Drug"),
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
+
+
 ```{r fig.width=12, fig.height=4}
 stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
@@ -137,7 +109,7 @@ stop %>%
   ggplot(mapping = aes(x = precinct, y = stops, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
   labs(title = "Proportion of Stops (Black) per Precinct by Crime Type",
-       y = "Percentage of Stops", x = "Precinct") +
+       y = "Proportion of Stops", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Crime",
@@ -145,7 +117,6 @@ stop %>%
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
 
-Previously, it seems that police is likely to use crime rate as a factor in determining whether to stop members of an ethnic group. However, after we control for the crime type, though black people are most arrested for drug crime, they are stopped most for weapon or violent crime. 
 
 ```{r fig.width=12, fig.height=4}
 stop %>%
@@ -156,7 +127,7 @@ stop %>%
   ggplot(mapping = aes(x = precinct, y = past.arrests, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
   labs(title = "Proportion of Past Arrests (Hispanic) per Precinct by Crime Type", 
-       y = "Percentage of Past Arrests", x = "Precinct") +
+       y = "Proportion of Past Arrests", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Crime",
@@ -172,7 +143,7 @@ stop %>%
   ggplot(mapping = aes(x = precinct, y = stops, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
   labs(title = "Proportion of Stops (Hispanic) per Precinct by Crime Type",
-       y = "Percentage of Stops", x = "Precinct") +
+       y = "Proportion of Stops", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Crime",
@@ -189,7 +160,7 @@ stop %>%
   ggplot(mapping = aes(x = precinct, y = past.arrests, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
   labs(title = "Proportion of Past Arrests (White) per Precinct by Crime Type", 
-       y = "Percentage of Past Arrests", x = "Precinct") +
+       y = "Proportion of Past Arrests", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Crime",
@@ -205,283 +176,80 @@ stop %>%
   ggplot(mapping = aes(x = precinct, y = stops, fill = crime)) +
   geom_bar(position = "fill", stat = "identity") +
   labs(title = "Proportion of Stops (White) per Precinct by Crime Type",
-       y = "Percentage of Stops", x = "Precinct") +
+       y = "Proportion of Stops", x = "Precinct") +
   theme_bw() +
   theme(legend.position = "bottom") +
   scale_fill_discrete(name = "Crime",
                       labels=c("Violent", "Weapons", "Property", "Drug"),
                       type = c("#25B388","#F26C24","#1C5DA6", "#F09A18"))
 ```
-A similar trend can be see in the graphs for white and hispanic ethnic groups. In each precinct, the crime type which people have high past arrest proportion in does not seem to be the crime type which people have high stop proportion in. 
-
-What happened? What determines the number of stops of an ethnic group in a certain precinct for a certain crime type? We control for crime type and build 3 models for each crime type. We hope to look at the effects of `past.arrests`, population distribution, race, and their possible interactions. 
 
 ```{r}
-#create datasets for each crime
-violent_crime <- stop %>%
+stop %>%
   mutate(eth = factor(eth, levels = c("3", "1", "2")),
          precinct = factor(precinct),
          crime = factor(crime)) %>%
-  filter(crime == "1")  %>%
   group_by(precinct) %>%
-  mutate(total_pop = sum(pop),
+  mutate(total_pop = sum(pop) / 4,
          pop_prop = pop / total_pop,
          total_arrest = sum(past.arrests),
          crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) #%>%
-  #select(-crime, -total_pop, -total_arrest, -precinct)
-
-weapon_crime <- stop %>%
-  mutate(eth = factor(eth, levels = c("3", "1", "2")),
-         precinct = factor(precinct),
-         crime = factor(crime)) %>%
-  filter(crime == "2")  %>%
-  group_by(precinct) %>%
-  mutate(total_pop = sum(pop),
-         pop_prop = pop / total_pop,
-         total_arrest = sum(past.arrests),
-         crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) #%>%
-  #select(-crime, -total_pop, -total_arrest, -precinct)
-
-property_crime <- stop %>%
-  mutate(eth = factor(eth, levels = c("3", "1", "2")),
-         precinct = factor(precinct),
-         crime = factor(crime)) %>%
-  filter(crime == "3")  %>%
-  group_by(precinct) %>%
-  mutate(total_pop = sum(pop),
-         pop_prop = pop / total_pop,
-         total_arrest = sum(past.arrests),
-         crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) #%>%
-  #select(-crime, -total_pop, -total_arrest, -precinct)
-
-drug_crime <- stop %>%
-  mutate(eth = factor(eth, levels = c("3", "1", "2")),
-         precinct = factor(precinct),
-         crime = factor(crime)) %>%
-  filter(crime == "4")  %>%
-  group_by(precinct) %>%
-  mutate(total_pop = sum(pop),
-         pop_prop = pop / total_pop,
-         total_arrest = sum(past.arrests),
-         crime_prop = past.arrests / total_arrest) %>%
-  ungroup(precinct) #%>%
-  #select(-crime, -total_pop, -total_arrest, -precinct)
+  group_by(eth, precinct) %>%
+  mutate(eth_crime = sum(crime_prop)) %>%
+  filter(crime == 1) %>%
+  ggplot(mapping = aes(x = pop_prop, y = eth_crime, color = eth)) +
+  geom_point() + theme_bw()+
+  labs(title="Past Arrests Prop.(All Crimes) vs. Population Prop. per Precinct",
+       x = "Population Proportion (per Precinct)",
+       y = "Past Arrests Proportion (All Crimes)") + 
+  scale_colour_discrete(name = "Ethnicity",
+                      labels=c("White", "Black", "Hispanic"),
+                      type = c("#9EBE00","#FD0006","#009B95"))
 ```
 
+```{r}
+stop %>%
+  mutate(eth = factor(eth, levels = c("3", "1", "2")),
+         precinct = factor(precinct),
+         crime = factor(crime)) %>%
+  group_by(precinct) %>%
+  mutate(total_pop = sum(pop) / 4,
+         pop_prop = pop / total_pop,
+         total_stop = sum(stops),
+         stop_prop = stops / total_stop) %>%
+  group_by(eth, precinct) %>%
+  mutate(eth_stop = sum(stop_prop)) %>%
+  filter(crime == 1) %>%
+  ggplot(mapping = aes(x = pop_prop, y = eth_stop, color = eth)) +
+  geom_point() + theme_bw()+
+  labs(title = "Stop Proportion (All Stops) vs. Population Proportion per Precinct",
+       x = "Population Proportion (per Precinct)", y = "Stop Proportion (All Stops)") + 
+  scale_colour_discrete(name = "Ethnicity",
+                      labels=c("White", "Black", "Hispanic"),
+                      type = c("#9EBE00","#FD0006","#009B95"))
+```
 
 ```{r}
-total_crime <- rbind(violent_crime, weapon_crime, property_crime, drug_crime) %>%
+## Data Cleaning 
+total_crime <- stop %>%
+  mutate(eth = factor(eth, levels = c("3", "1", "2")),
+         precinct = factor(precinct),
+         crime = factor(crime)) %>%
+  group_by(precinct) %>%
+  mutate(total_pop = sum(pop) / 4,
+         pop_prop = pop / total_pop,
+         total_arrest = sum(past.arrests),
+         crime_prop = past.arrests / total_arrest) %>%
   mutate(past.arrests = if_else(past.arrests!= 0, past.arrests, as.integer(1)))
 ```
 
 ```{r}
-#investigate mean and var of each stop 
-violent <- c(mean(violent_crime$stops), var(violent_crime$stops))
-Weapon <- c(mean(weapon_crime$stops), var(weapon_crime$stops))
-Property <- c(mean(property_crime$stops), var(property_crime$stops))
-Drug <- c(mean(drug_crime$stops), var(drug_crime$stops))
-df <- data.frame(violent, Weapon, Property, Drug)
-row.names(df) <- c("Mean", "Variance")
-df
+mean(total_crime$stops)
+var(total_crime$stops)
 ```
 
-In the mean and variances seen above, we can clearly see that the variance values for the number of stops by each crime type are all way larger than the mean number of stops for each crime type. This motivates us to use the Negative Binomial regression model.  
 
 # Modeling
-Justification for choosing covariates:
-
-  1. ethnicity: obvious because we want to look at the effect of race in the decision-making process of police and want to investigate whether there is potential bias against blacks or Hispanics
-
-  2. pop_prop/crime_pop: in EDA, we observe the relationship between population distribution, past arrests, and number of stops after we control for precinct. (cite a previous paper that talks about how precinct characteristics affect the number of stops). So in our model, we hope to include precinct characteristics as covariates. We summarize these characteristics using pop_prop and crime_prop, which reflect the population distribution and crime distribution of each ethnicity within each precinct.
-  
-  3. ethnicity:pop_prop: from EDA, it seems that the relationship between number of stops and pop_prop changes when the ethnicity changes.
-
-  4. ethnicity:crime_prop: for different ethnic groups, whether the effect of crime_prop on number of stops will change. From EDA, black people have high drug crime proportion, but they got high violent crime stops.
-
-  5. crime_prop:pop_prop: from EDA, we observe that even in precincts where majority of the population is white, black and hispanics still account for a high percentage of arrests. 
-
-For each crime type, we are going to fit 2 models initially, where each $\beta$ will be the coefficient for which we will derive a posterior distribution for. All models will be fit with a negative binomial sampling model as motivated by the EDA; and all models will be fit with a Cauchy prior with a location (or center) parameter of 0 and a scale of 2.5. This prior is proposed by the Gelman paper. 
-
-Model:
-$$
-log(mean(stops)) = log(past.arrests)+\beta_0+\beta_1*eth + \beta_2 *pop\_prop + \beta_3*crime\_type + \beta_4 *(eth:pop\_prop) + \beta_5*(crime\_type*pop\_prop) + \beta_6*(eth:crime\_type)
-$$
-From the above 2 models, we will use both the looIC and Bayes' Factor diagnostic to determine which base model has the most predictive power. 
-The Bayes' Factor diagnostic allows us to test under which model the observed data are more probable by comparing the marginal likelihood of the two models. A Bayes' Factor greater than 1 can be interpreted as that we have enough evidence to claim against the null (which is the hypothesis that some model $\mathcal{M}_1$ is better than $\mathcal{M}_2$)(Wetzels et al. 2011). However, this measure has some ambiguity as the two models proposed above do not have the same amount of covariates, therefore they do not have the same amount of coefficients; one can also further argue that, for model 1, we are in fact modeling for $log(mean(stops)/past.arrests)$ as opposed to the response variable $log(mean(stops))$ in model 2. Therefore, we choose to adjust for this ambiguity by using looIC as a second measure.  
-
-The looIC diagnostic is a model comparison measure for the two models' predictive accuracy. When comparing two fitted models, we can estimate the difference in their expected predictive accuracy by the difference in elpd_loo or elpd_waic (or multiplied by -2, if desired, to be on the deviance scale). When that difference, elpd_diff, is positive then the expected predictive accuracy for the second model is higher. A negative elpd_diff favors the first model.
-
-After selecting the optimal base model, we will compare it with its Poisson sampling model variant to ensure that our current base model indeed captures the overdispersion better than the Poisson sampling model. We will not be examining potential models where certain main effects or interactions gets dropped from the base model we chose earlier. This is because all main effects and interactions have shown to have obvious interactions and relationships through our EDA; even if their interaction may not be statistically significant, we still need to keep these covariates in order to adjust for the coefficients of other covariates present in the model. 
-
-
-## Total Crime
-
-```{r}
-cov.model.1 <- stan_glm(data = total_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop + crime) + 
-                      pop_prop * crime_prop + pop_prop * crime + crime_prop * crime,
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-cov.model.2 <- stan_glm(data = total_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop + crime) + 
-                      pop_prop * crime_prop + pop_prop * crime,
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-bayesfactor_models(cov.model.1, cov.model.2, denominator = cov.model.2)
-```
-
-```{r}
-rstanarm::loo_compare(loo(cov.model.1), loo(cov.model.2))
-```
-```{r}
-cov.model.3 <- stan_glm(data = total_crime,
-                    formula = stops ~ eth * (crime_prop + pop_prop + crime) + 
-                      pop_prop * crime_prop,
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-bayesfactor_models(cov.model.2, cov.model.3, denominator = cov.model.3)
-```
-
-```{r}
-rstanarm::loo_compare(loo(cov.model.2), loo(cov.model.3))
-```
-
-```{r}
-new.cov.model.1 <- stan_glm(data = total_crime,
-                    formula = stops ~ log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime,
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-rstanarm::loo_compare(loo(new.cov.model.1), loo(cov.model.1), loo(cov.model.3))
-```
-
-```{r}
-new.cov.model.2 <- stan_glm(data = total_crime,
-                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + eth*log(past.arrests) + pop_prop*log(past.arrests) + crime*log(past.arrests),
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-round(coef(new.cov.model.2), 3)
-round(posterior_interval(new.cov.model.2, prob = 0.95), 3)
-```
-
-```{r}
-bayesfactor_models(new.cov.model.1, new.cov.model.2, denominator = new.cov.model.2)
-```
-
-```{r}
-rstanarm::loo_compare(loo(new.cov.model.1), loo(new.cov.model.2))
-```
-```{r}
-new.cov.model.3 <- stan_glm(data = total_crime,
-                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + eth*log(past.arrests) + pop_prop*log(past.arrests),
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-bayesfactor_models(new.cov.model.3, new.cov.model.2, denominator = new.cov.model.3)
-```
-
-```{r}
-rstanarm::loo_compare(loo(new.cov.model.3), loo(new.cov.model.2))
-```
-
-```{r}
-new.cov.model.4 <- stan_glm(data = total_crime,
-                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + eth*log(past.arrests) + crime*log(past.arrests),
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-bayesfactor_models(new.cov.model.4, new.cov.model.2, denominator = new.cov.model.4)
-```
-
-```{r}
-rstanarm::loo_compare(loo(new.cov.model.2), loo(new.cov.model.4))
-```
-
-
-```{r}
-new.cov.model.5 <- stan_glm(data = total_crime,
-                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime) + pop_prop * crime + pop_prop*log(past.arrests) + crime*log(past.arrests),
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-
-```{r}
-bayesfactor_models(new.cov.model.5, new.cov.model.2, denominator = new.cov.model.2)
-```
-
-```{r}
-rstanarm::loo_compare(loo(new.cov.model.2), loo(new.cov.model.5))
-```
-```{r}
-new.cov.model.6 <- stan_glm(data = total_crime,
-                    formula = stops ~  log(past.arrests)+eth * (pop_prop + crime)  + pop_prop*log(past.arrests) + crime*log(past.arrests),
-                    family = neg_binomial_2(link = "log"),
-                    prior = cauchy(0, 2.5),
-                    prior_intercept = cauchy(0, 2.5),
-                    seed = 360,
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
-```
-```{r}
-rstanarm::loo_compare(loo(new.cov.model.2), loo(new.cov.model.6))
-```
-
-## offset models 
-
-
 ```{r}
 model.1 <- stan_glm(data = total_crime,
                     formula = stops ~ eth * (pop_prop + crime) + pop_prop * crime,
@@ -496,93 +264,66 @@ model.1 <- stan_glm(data = total_crime,
 
 ```{r}
 model.2 <- stan_glm(data = total_crime,
-                    formula = stops ~ eth * (pop_prop + crime),
+                    formula = stops ~ eth * (crime_prop + pop_prop + crime) + 
+                      pop_prop * crime_prop + pop_prop * crime +
+                      crime_prop * crime,
                     family = neg_binomial_2(link = "log"),
-                    offset = log(past.arrests),
-                    seed = 360,
                     prior = cauchy(0, 2.5),
                     prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
                     refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm1.csv"))
-```
-
-
-```{r}
-bayesfactor_models(model.1, model.2, denominator = model.2)
+                   diagnostic_file = file.path(tempdir(), "glm2.csv"))
 ```
 
 ```{r}
 model.3 <- stan_glm(data = total_crime,
-                    formula = stops ~ eth * pop_prop + crime,
+                    formula = stops ~ log(past.arrests)+
+                      eth * (pop_prop + crime) + pop_prop * crime,
                     family = neg_binomial_2(link = "log"),
-                    offset = log(past.arrests),
-                    seed = 360,
                     prior = cauchy(0, 2.5),
                     prior_intercept = cauchy(0, 2.5),
-                    refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm1.csv"))
-```
-
-
-```{r}
-bayesfactor_models(model.3, model.2, denominator = model.3)
-```
-
-```{r}
-model.4 <- stan_glm(data = total_crime,
-                    formula = stops ~ eth + pop_prop + crime,
-                    family = neg_binomial_2(link = "log"),
-                    offset = log(past.arrests),
                     seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+```{r}
+rstanarm::loo_compare(loo(model.1), loo(model.2), loo(model.3))
+```
+
+```{r}
+model.3.full <- stan_glm(data = total_crime,
+                    formula = stops ~  log(past.arrests)+
+                      eth * (pop_prop + crime) + pop_prop * crime+
+                      eth*log(past.arrests) + pop_prop*log(past.arrests) +
+                      crime*log(past.arrests),
+                    family = neg_binomial_2(link = "log"),
                     prior = cauchy(0, 2.5),
                     prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
                     refresh = 0,
-                   diagnostic_file = file.path(tempdir(), "glm1.csv"))
-```
-
-
-```{r}
-bayesfactor_models(model.3, model.4, denominator = model.4)
-```
-```{r}
-bayesfactor_models(model.2, model.4, denominator = model.4)
+                   diagnostic_file = file.path(tempdir(), "glm3full.csv"))
 ```
 
 ```{r}
-bayesfactor_models(model.1, model.4, denominator = model.4)
-```
-```{r}
-rstanarm::loo_compare(loo(model.1), loo(model.2), loo(model.3), loo(model.4))
-```
-
-## Interpretations & Conclusion
-
-### Violent
-
-```{r}
-mcmc_areas(as.matrix(model.4), prob = 0.95, prob_outer = 1)
-round(coef(model.4), 3)
-round(posterior_interval(model.4, prob = 0.95), 3)
+bayesfactor_models(model.3, model.3.full, denominator = model.3.full)
 ```
 
 ```{r}
-pp_check(model.4, plotfun = "stat_2d", stat = c("mean", "sd"))  
-pp_check(model.4, plotfun = "scatter_avg")
+rstanarm::loo_compare(loo(model.3), loo(model.3.full))
 ```
 
+See diagnostic plots in the pdf file Diagnostic-Plots within this GitHub Repository. 
+
+# Results
+
+```{r fig.width=8, fig.height=8}
+mcmc_areas(as.matrix(model.3.full), prob = 0.95, prob_outer = 1)
+```
 ```{r}
-mcmc_areas(as.matrix(model.2), prob = 0.95, prob_outer = 1)
-round(coef(model.2), 3)
-round(posterior_interval(model.2, prob = 0.95), 3)
+round(coef(model.3.full), 3)
+round(posterior_interval(model.3.full, prob = 0.95), 3)
 ```
 
-```{r}
-pp_check(model.2, plotfun = "stat_2d", stat = c("mean", "sd"))  
-pp_check(model.2, plotfun = "scatter_avg")
-```
 
-```{r}
-pp_check(model.1, plotfun = "stat_2d", stat = c("mean", "sd")) 
-pp_check(cov.model.1, plotfun = "stat_2d", stat = c("mean", "sd")) 
-pp_check(cov.model.3, plotfun = "stat_2d", stat = c("mean", "sd")) 
-```
+

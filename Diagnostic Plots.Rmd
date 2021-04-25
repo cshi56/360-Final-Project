@@ -1,0 +1,145 @@
+---
+title: "Investigating Racial Profiling"
+subtitle: "Diagnostic Plots"
+author: "Chen Shi, Belle Xu"
+date: "4/23/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(rstanarm)
+library(bayesplot)
+library(bayestestR)
+library(bridgesampling)
+library(logspline)
+```
+
+## Model Preparation
+
+```{r}
+stop <- read.table("stop-and-frisk.dat", header = TRUE)
+```
+
+```{r}
+total_crime <- stop %>%
+  mutate(eth = factor(eth, levels = c("3", "1", "2")),
+         precinct = factor(precinct),
+         crime = factor(crime)) %>%
+  group_by(precinct) %>%
+  mutate(total_pop = sum(pop) / 4,
+         pop_prop = pop / total_pop,
+         total_arrest = sum(past.arrests),
+         crime_prop = past.arrests / total_arrest) %>%
+  mutate(past.arrests = if_else(past.arrests!= 0, past.arrests, as.integer(1)))
+```
+
+```{r}
+model.3.full <- stan_glm(data = total_crime,
+                    formula = stops ~  log(past.arrests)+
+                      eth * (pop_prop + crime) + pop_prop * crime +
+                      eth*log(past.arrests) + pop_prop*log(past.arrests) +
+                      crime*log(past.arrests),
+                    family = neg_binomial_2(link = "log"),
+                    prior = cauchy(0, 2.5),
+                    prior_intercept = cauchy(0, 2.5),
+                    seed = 360,
+                    refresh = 0,
+                   diagnostic_file = file.path(tempdir(), "glm3.csv"))
+```
+
+## LOOIC Diagnostics
+
+```{r}
+#Pareto-K Diagnostic 
+loo <- loo(model.3.full)
+loo
+```
+
+```{r}
+#check for outliers that could cause skew in our posterior prediction
+plot(loo, label_points = TRUE)
+```
+
+## MCMC Chain Diagnostic 
+
+```{r}
+summary(model.3.full)
+```
+
+## Posterior Predictive Checks
+
+```{r}
+y.postpred <- posterior_predict(model.3.full)
+color_scheme_set("brightblue")
+ppc_dens_overlay(total_crime$stops, y.postpred) + xlim(0, 1000) 
+#xlim() truncates so that we focus on the part where x is less than 1000 
+```
+
+```{r}
+pp_check(model.3.full, plotfun = "stat_2d", stat = c("mean", "sd"))  
+pp_check(model.3.full, plotfun = "scatter_avg")
+```
+
+## Traceplots
+
+```{r}
+plot(model.3.full, "trace", pars = "log(past.arrests)")
+plot(model.3.full, "trace", pars = "eth1")
+plot(model.3.full, "trace", pars = "eth2")
+plot(model.3.full, "trace", pars = "pop_prop")
+plot(model.3.full, "trace", pars = "crime2")
+plot(model.3.full, "trace", pars = "crime3")
+plot(model.3.full, "trace", pars = "crime4")
+plot(model.3.full, "trace", pars = "eth1:pop_prop")
+plot(model.3.full, "trace", pars = "eth2:pop_prop")
+plot(model.3.full, "trace", pars = "eth1:crime2")
+plot(model.3.full, "trace", pars = "eth2:crime2")
+plot(model.3.full, "trace", pars = "eth1:crime3")
+plot(model.3.full, "trace", pars = "eth2:crime3")
+plot(model.3.full, "trace", pars = "eth1:crime4")
+plot(model.3.full, "trace", pars = "eth2:crime4")
+plot(model.3.full, "trace", pars = "pop_prop:crime2")
+plot(model.3.full, "trace", pars = "pop_prop:crime3")
+plot(model.3.full, "trace", pars = "pop_prop:crime4")
+plot(model.3.full, "trace", pars = "log(past.arrests):eth1")
+plot(model.3.full, "trace", pars = "log(past.arrests):eth2")
+plot(model.3.full, "trace", pars = "log(past.arrests):pop_prop")
+plot(model.3.full, "trace", pars = "log(past.arrests):crime2")
+plot(model.3.full, "trace", pars = "log(past.arrests):crime3")
+plot(model.3.full, "trace", pars = "log(past.arrests):crime4")
+plot(model.3.full, "trace", pars = "reciprocal_dispersion")
+```
+
+## ACF Plots 
+```{r}
+plot(model.3.full, "acf", pars = "log(past.arrests)")
+plot(model.3.full, "acf", pars = "eth1")
+plot(model.3.full, "acf", pars = "eth2")
+plot(model.3.full, "acf", pars = "pop_prop")
+plot(model.3.full, "acf", pars = "crime2")
+plot(model.3.full, "acf", pars = "crime3")
+plot(model.3.full, "acf", pars = "crime4")
+plot(model.3.full, "acf", pars = "eth1:pop_prop")
+plot(model.3.full, "acf", pars = "eth2:pop_prop")
+plot(model.3.full, "acf", pars = "eth1:crime2")
+plot(model.3.full, "acf", pars = "eth2:crime2")
+plot(model.3.full, "acf", pars = "eth1:crime3")
+plot(model.3.full, "acf", pars = "eth2:crime3")
+plot(model.3.full, "acf", pars = "eth1:crime4")
+plot(model.3.full, "acf", pars = "eth2:crime4")
+plot(model.3.full, "acf", pars = "pop_prop:crime2")
+plot(model.3.full, "acf", pars = "pop_prop:crime3")
+plot(model.3.full, "acf", pars = "pop_prop:crime4")
+plot(model.3.full, "acf", pars = "log(past.arrests):eth1")
+plot(model.3.full, "acf", pars = "log(past.arrests):eth2")
+plot(model.3.full, "acf", pars = "log(past.arrests):pop_prop")
+plot(model.3.full, "acf", pars = "log(past.arrests):crime2")
+plot(model.3.full, "acf", pars = "log(past.arrests):crime3")
+plot(model.3.full, "acf", pars = "log(past.arrests):crime4")
+plot(model.3.full, "acf", pars = "reciprocal_dispersion")
+```
+
+
